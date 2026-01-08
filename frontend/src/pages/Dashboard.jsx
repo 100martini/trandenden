@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { removeToken } from '../utils/auth';
+import '../styles/Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -32,84 +33,74 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <h2>Loading...</h2>
+      <div className="loading-container">
+        <div className="loading-card">
+          <h2>Loading...</h2>
+          <p>Please wait while we fetch your data</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: 'red' }}>
-        <h2>{error}</h2>
-        <button onClick={handleLogout}>Back to Login</button>
+      <div className="error-container">
+        <div className="error-card">
+          <h2>{error}</h2>
+          <button onClick={handleLogout} className="back-to-login-btn">
+            Back to Login
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1>Welcome, {user?.firstName || user?.login}!</h1>
-        <button onClick={handleLogout} style={{ 
-          padding: '0.5rem 1rem', 
-          background: '#ef4444', 
-          color: 'white', 
-          border: 'none', 
-          borderRadius: '8px',
-          cursor: 'pointer'
-        }}>
-          Logout
-        </button>
-      </div>
+    <div className="dashboard-container">
+      <div className="dashboard-content">
+        <div className="user-card">
+          <button onClick={handleLogout} className="logout-btn">
+            Logout
+          </button>
 
-      <div style={{ 
-        background: 'rgba(45, 53, 97, 0.6)', 
-        padding: '2rem', 
-        borderRadius: '12px',
-        marginBottom: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', marginBottom: '2rem' }}>
-          {user?.avatar?.medium && (
-            <img 
-              src={user.avatar.medium} 
-              alt={user.login}
-              style={{ width: '100px', height: '100px', borderRadius: '50%' }}
-            />
+          <div className="user-header">
+            {user?.avatar?.medium && (
+              <img 
+                src={user.avatar.medium} 
+                alt={user.login}
+                className="user-avatar"
+              />
+            )}
+            <div className="user-info">
+              <h2>{user?.displayName}</h2>
+              <p className="username">@{user?.login}</p>
+              <p className="email">{user?.email}</p>
+            </div>
+          </div>
+
+          <div className="user-stats">
+            <div className="stat-item">
+              <div className="stat-label">Campus</div>
+              <div className="stat-value">{user?.campus || 'N/A'}</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-label">Wallet</div>
+              <div className="stat-value">{user?.wallet} ₳</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-label">Correction Points</div>
+              <div className="stat-value">{user?.correctionPoints}</div>
+            </div>
+          </div>
+
+          {user?.cursus && user.cursus.length > 0 && (
+            <div className="cursus-section">
+              <div className="cursus-label">Cursus</div>
+              <p className="cursus-value">{user.cursus.join(', ')}</p>
+            </div>
           )}
-          <div>
-            <h2 style={{ margin: '0 0 0.5rem 0' }}>{user?.displayName}</h2>
-            <p style={{ margin: '0', color: '#a8b2d1' }}>@{user?.login}</p>
-            <p style={{ margin: '0.5rem 0 0 0', color: '#a8b2d1' }}>{user?.email}</p>
-          </div>
         </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <div>
-            <strong style={{ color: '#00babc' }}>Campus:</strong>
-            <p style={{ margin: '0.25rem 0 0 0' }}>{user?.campus || 'N/A'}</p>
-          </div>
-          <div>
-            <strong style={{ color: '#00babc' }}>Wallet:</strong>
-            <p style={{ margin: '0.25rem 0 0 0' }}>{user?.wallet} ₳</p>
-          </div>
-          <div>
-            <strong style={{ color: '#00babc' }}>Correction Points:</strong>
-            <p style={{ margin: '0.25rem 0 0 0' }}>{user?.correctionPoints}</p>
-          </div>
-        </div>
-
-        {user?.cursus && user.cursus.length > 0 && (
-          <div style={{ marginTop: '1rem' }}>
-            <strong style={{ color: '#00babc' }}>Cursus:</strong>
-            <p style={{ margin: '0.25rem 0 0 0' }}>{user.cursus.join(', ')}</p>
-          </div>
-        )}
       </div>
-
-      <p style={{ textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
-        You're successfully authenticated with 42 OAuth!
-      </p>
     </div>
   );
 };

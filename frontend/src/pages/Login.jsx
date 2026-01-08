@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import LoginButton from '../components/LoginButton';
 import { isAuthenticated } from '../utils/auth';
 import '../styles/Login.css';
 
@@ -32,39 +31,48 @@ const Login = () => {
     }
   }, [navigate, searchParams]);
 
+  const handleOAuthLogin = () => {
+    window.location.href = 'http://localhost:3000/api/auth/42';
+  };
+
   return (
-    <div className="login-container">
-      <div className="login-content">
-        <div className="logo-42">42</div>
-        
-        <h1 className="app-title">Project Hub</h1>
-        <p className="app-subtitle">Collaborate on 42 projects with your team</p>
+    <div className="container">
+      <div className="logo-section">
+        <div className="logo">21</div>
+        <h1>Project Hub</h1>
+        <p>Collaborate on 42 projects with your team</p>
+      </div>
 
-        <div className="login-card">
-          <h2 className="login-title">Welcome back</h2>
-          
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
+      <div className="login-card">
+        <h2>Welcome back</h2>
 
-          <LoginButton />
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+
+        <button className="btn-42" onClick={handleOAuthLogin}>
+          <svg viewBox="0 0 137 95" fill="currentColor">
+            <polygon points="0,0 68,0 68,27 27,27 27,68 0,68"/>
+            <polygon points="41,27 68,27 68,68 95,68 95,0 137,0 137,95 68,95 68,54 41,54"/>
+          </svg>
+          Continue with 42 Intra
+        </button>
+      </div>
+
+      <div className="features">
+        <div className="feature">
+          <div className="feature-icon">Team</div>
+          <p>Collaboration</p>
         </div>
-
-        <div className="login-footer">
-          <div className="footer-item">
-            <span className="footer-label">Team</span>
-            <span className="footer-value">Collaboration</span>
-          </div>
-          <div className="footer-item">
-            <span className="footer-label">Task</span>
-            <span className="footer-value">Management</span>
-          </div>
-          <div className="footer-item">
-            <span className="footer-label">Game</span>
-            <span className="footer-value">Hub</span>
-          </div>
+        <div className="feature">
+          <div className="feature-icon">Task</div>
+          <p>Management</p>
+        </div>
+        <div className="feature">
+          <div className="feature-icon">Game</div>
+          <p>Hub</p>
         </div>
       </div>
     </div>
