@@ -23,7 +23,7 @@ const AuthSuccess = () => {
   return (
     <div className="login-container">
       <div className="loading">
-        <h2>🔐 Logging you in...</h2>
+        <h2>Logging you in...</h2>
         <p>Please wait while we authenticate you.</p>
       </div>
     </div>

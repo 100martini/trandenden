@@ -34,72 +34,37 @@ const Login = () => {
 
   return (
     <div className="login-container">
-      <div className="login-header">
-        <div className="logo-container">
-          <div className="logo-42">42</div>
-        </div>
+      <div className="login-content">
+        <div className="logo-42">42</div>
+        
         <h1 className="app-title">Project Hub</h1>
         <p className="app-subtitle">Collaborate on 42 projects with your team</p>
-      </div>
 
-      <div className="login-card">
-        <h2 className="login-title">Welcome back</h2>
+        <div className="login-card">
+          <h2 className="login-title">Welcome back</h2>
+          
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
 
-        {error && (
-          <div className="error-message">
-            {error}
+          <LoginButton />
+        </div>
+
+        <div className="login-footer">
+          <div className="footer-item">
+            <span className="footer-label">Team</span>
+            <span className="footer-value">Collaboration</span>
           </div>
-        )}
-
-        <LoginButton />
-
-        <div className="divider">
-          <span>or</span>
-        </div>
-
-        <form onSubmit={(e) => e.preventDefault()}>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input
-              type="email"
-              className="form-input"
-              placeholder="your@email.com"
-              disabled
-            />
+          <div className="footer-item">
+            <span className="footer-label">Task</span>
+            <span className="footer-value">Management</span>
           </div>
-
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="••••••••••••"
-              disabled
-            />
+          <div className="footer-item">
+            <span className="footer-label">Game</span>
+            <span className="footer-value">Hub</span>
           </div>
-
-          <button type="submit" className="sign-in-btn" disabled>
-            Sign In
-          </button>
-        </form>
-
-        <div className="signup-link">
-          Don't have an account? <a href="#">Sign up</a>
-        </div>
-      </div>
-
-      <div className="login-footer">
-        <div className="footer-item">
-          <span className="footer-label">Team</span>
-          <span className="footer-value">Collaboration</span>
-        </div>
-        <div className="footer-item">
-          <span className="footer-label">Task</span>
-          <span className="footer-value">Management</span>
-        </div>
-        <div className="footer-item">
-          <span className="footer-label">Game</span>
-          <span className="footer-value">Hub</span>
         </div>
       </div>
     </div>
