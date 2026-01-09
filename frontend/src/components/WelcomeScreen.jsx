@@ -11,7 +11,6 @@ const WelcomeScreen = ({ user, onComplete }) => {
   }, [onComplete]);
 
   const firstName = user?.firstName || user?.login || 'Student';
-  
   const level = user?.level || 
                 user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level ||
                 user?.cursusUsers?.[user?.cursusUsers.length - 1]?.level || 0;

@@ -136,7 +136,7 @@ class AuthController {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      //cheking if data is stale (older than 1 hour)
+      //just checking if data is stale (older than 1 hour)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       if (user.lastSyncedAt < oneHourAgo && user.accessToken) {
         console.log('Data is stale, fetching fresh data from 42 API...');

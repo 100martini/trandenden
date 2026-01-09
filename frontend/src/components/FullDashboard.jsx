@@ -22,7 +22,6 @@ const FullDashboard = ({ user }) => {
                 user?.cursusUsers?.[user?.cursusUsers.length - 1]?.level || 0;
                 
   const avatarUrl = user?.avatar?.medium || user?.avatar;
-
   const projects = user?.projectsUsers || [];
   const activeProjects = projects.filter(p => p.status === 'in_progress' || p.status === 'searching_a_group').length;
   const completedProjects = projects.filter(p => p.status === 'finished' && p['validated?']).length;

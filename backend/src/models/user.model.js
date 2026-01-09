@@ -40,12 +40,15 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  
   cursusUsers: [{
     type: mongoose.Schema.Types.Mixed
   }],
+  
   projectsUsers: [{
     type: mongoose.Schema.Types.Mixed
   }],
+  
   achievements: [{
     type: mongoose.Schema.Types.Mixed
   }],
@@ -69,7 +72,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Don't send sensitive tokens
+//WARNING! sensitive content. dont send them okay?
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.accessToken;
