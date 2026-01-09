@@ -4,7 +4,6 @@ const User = require('../models/user.model');
 const oauthConfig = require('../config/oauth.config');
 
 class AuthController {
-  //redirect user to 42 OAuth login page
   async redirectTo42(req, res) {
     try {
       const state = Math.random().toString(36).substring(7); //CSRF
@@ -31,7 +30,6 @@ class AuthController {
     try {
       const { code, state, error } = req.query;
 
-      //user denied access
       if (error) {
         console.log('User denied access:', error);
         return res.redirect(`${process.env.FRONTEND_URL}/login?error=access_denied`);
@@ -63,46 +61,50 @@ class AuthController {
 
       const profile = userResponse.data;
       console.log('User profile received:', profile.login);
+      console.log('Projects count:', profile.projects_users?.length || 0);
+      console.log('Cursus count:', profile.cursus_users?.length || 0);
 
-      //create or update user in database
       let user = await User.findOne({ intraId: profile.id });
 
-      if (!user) {
-        console.log('Creating new user...');
-        user = await User.create({
-          intraId: profile.id,
-          login: profile.login,
-          email: profile.email,
-          firstName: profile.first_name,
-          lastName: profile.last_name,
-          displayName: profile.displayname,
-          avatar: {
-            small: profile.image?.versions?.small,
-            medium: profile.image?.versions?.medium,
-            large: profile.image?.versions?.large
-          },
-          campus: profile.campus?.[0]?.name,
-          cursus: profile.cursus_users?.map(c => c.cursus.name) || [],
-          wallet: profile.wallet,
-          correctionPoints: profile.correction_point,
-          accessToken: access_token,
-          refreshToken: refresh_token,
-          tokenExpiresAt: new Date(Date.now() + expires_in * 1000)
-        });
-        console.log('New user created');
-      } else {
-        console.log('Updating existing user...');
-        user.accessToken = access_token;
-        user.refreshToken = refresh_token;
-        user.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
-        user.lastLogin = new Date();
-        user.avatar = {
+      const userData = {
+        intraId: profile.id,
+        login: profile.login,
+        email: profile.email,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        displayName: profile.displayname,
+        avatar: {
           small: profile.image?.versions?.small,
           medium: profile.image?.versions?.medium,
           large: profile.image?.versions?.large
-        };
+        },
+        campus: profile.campus?.[0]?.name,
+        cursus: profile.cursus_users?.map(c => c.cursus.name) || [],
+        wallet: profile.wallet,
+        correctionPoints: profile.correction_point,
+        
+        level: profile.cursus_users?.[0]?.level || 0,
+        cursusUsers: profile.cursus_users || [],
+        projectsUsers: profile.projects_users || [],
+        achievements: profile.achievements || [],
+        coalition: profile.coalitions?.[0],
+        
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+        lastSyncedAt: new Date()
+      };
+
+      if (!user) {
+        console.log('Creating new user with full data...');
+        user = await User.create(userData);
+        console.log('New user created with', user.projectsUsers?.length || 0, 'projects');
+      } else {
+        console.log('Updating existing user with full data...');
+        Object.assign(user, userData);
+        user.lastLogin = new Date();
         await user.save();
-        console.log('User updated');
+        console.log('User updated with', user.projectsUsers?.length || 0, 'projects');
       }
 
       const jwtToken = jwt.sign(
@@ -127,10 +129,38 @@ class AuthController {
 
   async getCurrentUser(req, res) {
     try {
-      const user = await User.findById(req.userId).select('-accessToken -refreshToken');
+      let user = await User.findById(req.userId).select('-accessToken -refreshToken');
       
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
+      }
+
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      if (user.lastSyncedAt < oneHourAgo && user.accessToken) {
+        console.log('Data is stale, fetching fresh data from 42 API...');
+        
+        try {
+          const fullUser = await User.findById(req.userId);
+          const response = await axios.get(`${oauthConfig.apiURL}/me`, {
+            headers: { 'Authorization': `Bearer ${fullUser.accessToken}` }
+          });
+          
+          const profile = response.data;
+          
+          user.level = profile.cursus_users?.[0]?.level || 0;
+          user.cursusUsers = profile.cursus_users || [];
+          user.projectsUsers = profile.projects_users || [];
+          user.achievements = profile.achievements || [];
+          user.wallet = profile.wallet;
+          user.correctionPoints = profile.correction_point;
+          user.lastSyncedAt = new Date();
+          
+          await user.save();
+          
+          console.log('Fresh data fetched and saved');
+        } catch (syncError) {
+          console.error('Failed to sync data:', syncError.message);
+        }
       }
 
       res.json(user);

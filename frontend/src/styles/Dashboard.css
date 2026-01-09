@@ -210,7 +210,6 @@
   margin-top: 1rem;
 }
 
-/* Responsive Design */
 @media (max-width: 968px) {
   .user-stats {
     grid-template-columns: 1fr;

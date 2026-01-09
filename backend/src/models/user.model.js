@@ -35,12 +35,34 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  
+  level: {
+    type: Number,
+    default: 0
+  },
+  cursusUsers: [{
+    type: mongoose.Schema.Types.Mixed
+  }],
+  projectsUsers: [{
+    type: mongoose.Schema.Types.Mixed
+  }],
+  achievements: [{
+    type: mongoose.Schema.Types.Mixed
+  }],
+  coalition: {
+    type: mongoose.Schema.Types.Mixed
+  },
+  
   accessToken: String,
   refreshToken: String,
   tokenExpiresAt: Date,
   lastLogin: { 
     type: Date, 
     default: Date.now 
+  },
+  lastSyncedAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true
