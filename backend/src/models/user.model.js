@@ -49,6 +49,7 @@ const userSchema = new mongoose.Schema({
   achievements: [{
     type: mongoose.Schema.Types.Mixed
   }],
+  
   coalition: {
     type: mongoose.Schema.Types.Mixed
   },
@@ -68,6 +69,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Don't send sensitive tokens
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.accessToken;

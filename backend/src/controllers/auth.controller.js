@@ -83,7 +83,8 @@ class AuthController {
         wallet: profile.wallet,
         correctionPoints: profile.correction_point,
         
-        level: profile.cursus_users?.[0]?.level || 0,
+        level: profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
+               profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0,
         cursusUsers: profile.cursus_users || [],
         projectsUsers: profile.projects_users || [],
         achievements: profile.achievements || [],
@@ -135,6 +136,7 @@ class AuthController {
         return res.status(404).json({ error: 'User not found' });
       }
 
+      //cheking if data is stale (older than 1 hour)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       if (user.lastSyncedAt < oneHourAgo && user.accessToken) {
         console.log('Data is stale, fetching fresh data from 42 API...');
@@ -147,7 +149,8 @@ class AuthController {
           
           const profile = response.data;
           
-          user.level = profile.cursus_users?.[0]?.level || 0;
+          user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
+                       profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
           user.cursusUsers = profile.cursus_users || [];
           user.projectsUsers = profile.projects_users || [];
           user.achievements = profile.achievements || [];
@@ -170,9 +173,65 @@ class AuthController {
     }
   }
 
+  async refreshUserData(req, res) {
+    try {
+      console.log('Manual refresh requested by user:', req.userId);
+      
+      const user = await User.findById(req.userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (!user.accessToken) {
+        return res.status(400).json({ error: 'No access token available' });
+      }
+
+      console.log('Fetching fresh data from 42 API...');
+      const response = await axios.get(`${oauthConfig.apiURL}/me`, {
+        headers: { 'Authorization': `Bearer ${user.accessToken}` }
+      });
+      
+      const profile = response.data;
+      
+      user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
+                   profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
+      user.cursusUsers = profile.cursus_users || [];
+      user.projectsUsers = profile.projects_users || [];
+      user.achievements = profile.achievements || [];
+      user.wallet = profile.wallet;
+      user.correctionPoints = profile.correction_point;
+      user.campus = profile.campus?.[0]?.name;
+      user.avatar = {
+        small: profile.image?.versions?.small,
+        medium: profile.image?.versions?.medium,
+        large: profile.image?.versions?.large
+      };
+      user.lastSyncedAt = new Date();
+      
+      await user.save();
+      
+      console.log('User data refreshed successfully');
+      console.log('New level:', user.level);
+      console.log('Projects count:', user.projectsUsers?.length || 0);
+      
+      const userResponse = user.toJSON();
+      res.json({ 
+        message: 'Data refreshed successfully',
+        user: userResponse 
+      });
+      
+    } catch (error) {
+      console.error('Refresh user data error:', error.response?.data || error.message);
+      res.status(500).json({ 
+        error: 'Failed to refresh user data',
+        details: error.message 
+      });
+    }
+  }
+
   async logout(req, res) {
     try {
-      //in a real app we might want to blacklist the JWT or revoke the 42 token
       res.json({ message: 'Logged out successfully' });
     } catch (error) {
       console.error('Logout error:', error.message);

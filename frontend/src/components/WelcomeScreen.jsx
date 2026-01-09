@@ -11,7 +11,11 @@ const WelcomeScreen = ({ user, onComplete }) => {
   }, [onComplete]);
 
   const firstName = user?.firstName || user?.login || 'Student';
-  const campus = user?.campus || 'Campus';
+  
+  const level = user?.level || 
+                user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level ||
+                user?.cursusUsers?.[user?.cursusUsers.length - 1]?.level || 0;
+                
   const wallet = user?.wallet || 0;
   const correctionPoints = user?.correctionPoints || 0;
   const avatarUrl = user?.avatar?.medium || user?.avatar;
@@ -32,16 +36,16 @@ const WelcomeScreen = ({ user, onComplete }) => {
         )}
         
         <h1 className="welcome-title">
-          Welcome, {firstName}! 👋
+          Welcome back, {firstName}! 👋
         </h1>
         
-        <p className="welcome-subtitle">
-          {campus}
-        </p>
+        <div className="welcome-level">
+          Level {level.toFixed(2)}
+        </div>
         
         <div className="welcome-stats">
           <div className="welcome-stat">
-            <div className="welcome-stat-value">{wallet} ₳</div>
+            <div className="welcome-stat-value">{wallet}</div>
             <div className="welcome-stat-label">Wallet</div>
           </div>
           <div className="welcome-divider"></div>

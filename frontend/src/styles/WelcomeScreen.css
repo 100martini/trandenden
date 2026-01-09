@@ -64,14 +64,19 @@
   font-size: 2rem;
   font-weight: 700;
   color: var(--cream);
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 1rem 0;
   animation: fadeIn 0.8s ease-out 0.5s both;
 }
 
-.welcome-subtitle {
-  color: var(--light);
-  font-size: 1.125rem;
-  margin: 0 0 2rem 0;
+.welcome-level {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--light), var(--cream));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 2rem;
   animation: fadeIn 0.8s ease-out 0.7s both;
 }
 
@@ -90,14 +95,14 @@
 
 .welcome-stat-value {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--cream);
   margin-bottom: 0.25rem;
 }
 
 .welcome-stat-label {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   color: var(--light);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -193,12 +198,12 @@
     font-size: 1.5rem;
   }
 
-  .welcome-subtitle {
-    font-size: 1rem;
+  .welcome-level {
+    font-size: 2rem;
   }
 
   .welcome-stat-value {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
 
   .welcome-stats {

@@ -36,43 +36,41 @@ const Login = () => {
   };
 
   return (
-    <div className="container">
-      <div className="logo-section">
-        <div className="logo">21</div>
-        <h1>Project Hub</h1>
-        <p>Collaborate on 42 projects with your team</p>
-      </div>
+    <div className="login-page">
+      <div className="container">
+        <div className="logo-section">
+          <div className="logo">21</div>
+          <h1>Project Hub</h1>
+          <p>Collaborate on 42 projects with your team</p>
+        </div>
 
-      <div className="login-card">
-        <h2>Welcome back</h2>
+        <div className="login-card">
+          <h2>Ready to code?</h2>
 
-        {error && (
-          <div className="error-message">
-            {error}
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
+
+          <button className="btn-42" onClick={handleOAuthLogin}>
+            Continue with 42 Intra
+          </button>
+        </div>
+
+        <div className="features">
+          <div className="feature">
+            <div className="feature-icon">Team</div>
+            <p>Collaboration</p>
           </div>
-        )}
-
-        <button className="btn-42" onClick={handleOAuthLogin}>
-          <svg viewBox="0 0 137 95" fill="currentColor">
-            <polygon points="0,0 68,0 68,27 27,27 27,68 0,68"/>
-            <polygon points="41,27 68,27 68,68 95,68 95,0 137,0 137,95 68,95 68,54 41,54"/>
-          </svg>
-          Continue with 42 Intra
-        </button>
-      </div>
-
-      <div className="features">
-        <div className="feature">
-          <div className="feature-icon">Team</div>
-          <p>Collaboration</p>
-        </div>
-        <div className="feature">
-          <div className="feature-icon">Task</div>
-          <p>Management</p>
-        </div>
-        <div className="feature">
-          <div className="feature-icon">Game</div>
-          <p>Hub</p>
+          <div className="feature">
+            <div className="feature-icon">Task</div>
+            <p>Management</p>
+          </div>
+          <div className="feature">
+            <div className="feature-icon">Game</div>
+            <p>Hub</p>
+          </div>
         </div>
       </div>
     </div>

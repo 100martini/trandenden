@@ -13,38 +13,26 @@
   box-sizing: border-box;
 }
 
-html, body {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  margin: 0;
-  padding: 0;
-}
-
-#root {
-  height: 100%;
-  width: 100%;
+.login-page {
+  min-height: 100vh;
+  background: #201C2A;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-body {
-  font-family: 'Inter', sans-serif;
-  background: #201C2A;
-}
-
-.container {
-  max-width: 420px;
   padding: 20px;
 }
 
-.logo-section {
-  text-align: center;
-  margin-bottom: 24px;
+.login-page .container {
+  width: 100%;
+  max-width: 420px;
 }
 
-.logo {
+.login-page .logo-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.login-page .logo {
   width: 80px;
   height: 80px;
   background: linear-gradient(135deg, var(--light) 0%, var(--cream) 100%);
@@ -56,11 +44,11 @@ body {
   font-size: 32px;
   font-weight: 700;
   color: var(--dark);
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
-.logo-section h1 {
+.login-page .logo-section h1 {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 28px;
   font-weight: 700;
@@ -68,21 +56,22 @@ body {
   margin-bottom: 8px;
 }
 
-.logo-section p {
+.login-page .logo-section p {
   color: var(--light);
   font-size: 14px;
 }
 
-.login-card {
+.login-page .login-card {
   width: 100%;
   background: rgba(37, 32, 48, 0.8);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(185, 180, 199, 0.1);
   border-radius: 24px;
   padding: 40px;
+  margin-bottom: 24px;
 }
 
-.login-card h2 {
+.login-page .login-card h2 {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 20px;
   color: var(--cream);
@@ -90,7 +79,7 @@ body {
   margin-bottom: 32px;
 }
 
-.error-message {
+.login-page .error-message {
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid #ef4444;
   color: #fca5a5;
@@ -101,7 +90,7 @@ body {
   text-align: center;
 }
 
-.btn-42 {
+.login-page .btn-42 {
   width: 100%;
   background: var(--cream);
   color: var(--dark);
@@ -115,30 +104,24 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
   transition: all 0.3s ease;
   box-shadow: 0 4px 20px rgba(250, 240, 230, 0.15);
 }
 
-.btn-42:hover {
+.login-page .btn-42:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 30px rgba(250, 240, 230, 0.25);
 }
 
-.btn-42 svg {
-  width: 24px;
-  height: 24px;
-}
-
-.features {
+.login-page .features {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 32px;
 }
 
-.feature {
+.login-page .feature {
   background: rgba(37, 32, 48, 0.6);
   border: 1px solid rgba(185, 180, 199, 0.08);
   border-radius: 16px;
@@ -146,36 +129,28 @@ body {
   text-align: center;
 }
 
-.feature-icon {
+.login-page .feature-icon {
   font-size: 12px;
   font-weight: 600;
   color: var(--cream);
   margin-bottom: 8px;
 }
 
-.feature p {
+.login-page .feature p {
   color: var(--light);
   font-size: 11px;
 }
 
 @media (max-width: 640px) {
-  .container {
-    max-width: 100%;
-  }
-
-  .logo-section h1 {
-    font-size: 24px;
-  }
-
-  .login-card {
+  .login-page .login-card {
     padding: 32px 24px;
   }
 
-  .features {
+  .login-page .features {
     gap: 8px;
   }
 
-  .feature {
+  .login-page .feature {
     padding: 16px 8px;
   }
 }
