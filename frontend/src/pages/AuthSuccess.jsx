@@ -23,11 +23,11 @@ const AuthSuccess = () => {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
-      background: '#1a1721',
+      background: '#201C2A',
       color: '#FAF0E6',
       fontFamily: 'Space Grotesk, sans-serif'
     }}>
-      Authenticating...
+      {/* Instant navigation - no loading screen */}
     </div>
   );
 };
