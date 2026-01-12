@@ -9,6 +9,7 @@ NC := \033[0m
 
 PROJECT_NAME := trandenden
 MARIADB_CONTAINER := mariadb
+MONGO_CONTAINER := mongodb
 NETWORK_NAME := transcendence-net
 BACKEND_PORT := 3001
 FRONTEND_PORT := 5173
@@ -17,7 +18,7 @@ help:
 	@echo ""
 	@echo "  $(YELLOW)make check-node$(NC)    - Check Node.js version (needs v18+)"
 	@echo "  $(YELLOW)make install$(NC)       - Install all dependencies"
-	@echo "  $(YELLOW)make start$(NC)         - Start MariaDB + Backend + Frontend"
+	@echo "  $(YELLOW)make start$(NC)         - Start MongoDB + MariaDB + Backend + Frontend"
 	@echo "  $(YELLOW)make stop$(NC)          - Stop all servers"
 	@echo "  $(YELLOW)make restart$(NC)       - Restart everything"
 	@echo "  $(YELLOW)make clean$(NC)         - Clean up Docker containers and network"
@@ -43,6 +44,15 @@ _network:
 	@docker network inspect $(NETWORK_NAME) >/dev/null 2>&1 || \
 		docker network create $(NETWORK_NAME) >/dev/null 2>&1
 
+_mongodb: _network
+	@docker rm -f $(MONGO_CONTAINER) 2>/dev/null || true
+	@docker run -d \
+		--name $(MONGO_CONTAINER) \
+		--network $(NETWORK_NAME) \
+		-p 27017:27017 \
+		mongo:latest >/dev/null 2>&1
+	@sleep 2
+
 _mariadb: _network
 	@docker rm -f $(MARIADB_CONTAINER) 2>/dev/null || true
 	@docker run -d \
@@ -55,7 +65,7 @@ _mariadb: _network
 		mariadb:latest >/dev/null 2>&1
 	@sleep 3
 
-start: _mariadb
+start: _mongodb _mariadb
 	@echo ""
 	@trap 'kill 0' EXIT; \
 	(cd backend && npm run dev 2>&1 | while IFS= read -r line; do printf "$(BLUE)[BACKEND]$(NC)  %s\n" "$$line"; done) & \
@@ -65,11 +75,11 @@ start: _mariadb
 stop:
 	@echo "$(RED)Stopping all servers$(NC)"
 	@-killall -q node 2>/dev/null || true
-	@-docker stop $(MARIADB_CONTAINER) 2>/dev/null || true
+	@-docker stop $(MONGO_CONTAINER) $(MARIADB_CONTAINER) 2>/dev/null || true
 
 clean: stop
 	@echo "$(RED)Cleaning up Docker resources$(NC)"
-	@docker rm -f $(MARIADB_CONTAINER) 2>/dev/null || true
+	@docker rm -f $(MONGO_CONTAINER) $(MARIADB_CONTAINER) 2>/dev/null || true
 	@docker network rm $(NETWORK_NAME) 2>/dev/null || true
 	@echo "$(GREEN)Cleanup complete$(NC)"
 
@@ -77,6 +87,6 @@ restart: stop start
 
 logs:
 	@echo "$(BLUE)Docker Status:$(NC)"
-	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "NAMES|mariadb" || echo "No containers running"
+	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "NAMES|mongo|mariadb" || echo "No containers running"
 
 .DEFAULT_GOAL := help
