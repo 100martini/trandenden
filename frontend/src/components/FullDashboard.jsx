@@ -31,26 +31,19 @@ const FullDashboard = ({ user }) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const getProjectIcon = (projectName) => {
-    const name = projectName.toLowerCase();
-    if (name.includes('exam')) return '📝';
-    if (name.includes('cpp') || name.includes('c++')) return '⚙️';
-    if (name.includes('webserv') || name.includes('web')) return '🌐';
-    if (name.includes('inception')) return '🐳';
-    if (name.includes('transcendence') || name.includes('ft_transcendence')) return '🎮';
-    if (name.includes('minishell')) return '💻';
-    if (name.includes('philosophers')) return '🍝';
-    if (name.includes('cub3d')) return '🎮';
-    if (name.includes('miniRT') || name.includes('minirt')) return '🎨';
-    if (name.includes('push_swap')) return '🔄';
-    if (name.includes('so_long')) return '🗺️';
-    if (name.includes('pipex')) return '⚡';
-    if (name.includes('born2beroot')) return '🔐';
-    if (name.includes('printf')) return '📄';
-    if (name.includes('get_next_line')) return '📖';
-    if (name.includes('libft')) return '📚';
-    return '🚀';
-  };
+  const titles = [
+  "the Legendary",
+  "the Mighty",
+  "the Architect",
+  "the Unstoppable",
+  "the Bug Slayer",
+  "the Chosen One",
+  "the Code Wizard",
+  ];
+
+  const randomTitle =
+    titles[Math.floor(Math.random() * titles.length)];
+
 
   return (
     <div className="full-dashboard">
@@ -102,7 +95,7 @@ const FullDashboard = ({ user }) => {
       <main className="main">
         <div className="header">
           <div>
-            <h1>Welcome back! 👋</h1>
+            <h1>{username}, {randomTitle}</h1>
             <p>Here's what's happening with your projects</p>
           </div>
           <button className="btn-new-project">

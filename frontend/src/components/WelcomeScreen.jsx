@@ -35,7 +35,7 @@ const WelcomeScreen = ({ user, onComplete }) => {
         )}
         
         <h1 className="welcome-title">
-          Welcome back, {firstName}! 👋
+          Welcome back, {firstName}!
         </h1>
         
         <div className="welcome-level">

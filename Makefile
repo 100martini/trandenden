@@ -1,4 +1,4 @@
-.PHONY: help install start stop restart dev backend frontend logs
+.PHONY: help install start stop restart clean logs check-node
 
 GREEN := \033[0;32m
 BLUE := \033[0;34m
@@ -8,73 +8,80 @@ CYAN := \033[0;36m
 NC := \033[0m
 
 PROJECT_NAME := trandenden
-MONGO_CONTAINER := mongodb
 MARIADB_CONTAINER := mariadb
-BACKEND_PORT := 3000
+NETWORK_NAME := transcendence-net
+BACKEND_PORT := 3001
 FRONTEND_PORT := 5173
 
 help:
 	@echo ""
+	@echo "  $(YELLOW)make check-node$(NC)    - Check Node.js version (needs v18+)"
 	@echo "  $(YELLOW)make install$(NC)       - Install all dependencies"
-	@echo "  $(YELLOW)make start$(NC)         - Start MongoDB + MariaDB + Backend + Frontend"
+	@echo "  $(YELLOW)make start$(NC)         - Start MariaDB + Backend + Frontend"
 	@echo "  $(YELLOW)make stop$(NC)          - Stop all servers"
 	@echo "  $(YELLOW)make restart$(NC)       - Restart everything"
-	@echo "  $(YELLOW)make dev$(NC)           - Start in development mode"
-	@echo "  $(YELLOW)make backend$(NC)       - Start only backend"
-	@echo "  $(YELLOW)make frontend$(NC)      - Start only frontend"
+	@echo "  $(YELLOW)make clean$(NC)         - Clean up Docker containers and network"
 	@echo "  $(YELLOW)make logs$(NC)          - Show all logs"
 	@echo ""
 
-install:
+check-node:
+	@NODE_VERSION=$$(node --version | cut -d'v' -f2 | cut -d'.' -f1); \
+	if [ $$NODE_VERSION -lt 18 ]; then \
+		echo "$(RED)Error: Node.js version $$NODE_VERSION detected. Need v18 or higher.$(NC)"; \
+		echo "$(YELLOW)Install with: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash$(NC)"; \
+		echo "$(YELLOW)Then: nvm install 20 && nvm use 20$(NC)"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)Node.js v$$NODE_VERSION - OK$(NC)"; \
+	fi
+
+install: check-node
 	@echo "$(BLUE)Installing dependencies$(NC)"
 	@cd backend && npm install
 	@cd frontend && npm install
 	@echo "$(GREEN)All dependencies installed$(NC)"
 
-_mongo:
-	@docker ps -a | grep $(MONGO_CONTAINER) > /dev/null 2>&1 && \
-		docker start $(MONGO_CONTAINER) > /dev/null 2>&1 || \
-		docker run -d -p 27017:27017 --name $(MONGO_CONTAINER) mongo:latest > /dev/null 2>&1
-	@sleep 2
+_network:
+	@docker network inspect $(NETWORK_NAME) >/dev/null 2>&1 || \
+		docker network create $(NETWORK_NAME) >/dev/null 2>&1
 
-_mariadb:
-	@docker ps -a | grep $(MARIADB_CONTAINER) > /dev/null 2>&1 && \
-		docker start $(MARIADB_CONTAINER) > /dev/null 2>&1 || \
-		docker run -d -p 3306:3306 --name $(MARIADB_CONTAINER) \
-			-e MYSQL_ROOT_PASSWORD=root \
-			-e MYSQL_DATABASE=trandenden \
-			-e MYSQL_USER=transcendence \
-			-e MYSQL_PASSWORD=transcendence \
-			mariadb:latest > /dev/null 2>&1
-	@sleep 2
+_mariadb: _network
+	@docker rm -f $(MARIADB_CONTAINER) 2>/dev/null || true
+	@docker run -d \
+		--name $(MARIADB_CONTAINER) \
+		--network $(NETWORK_NAME) \
+		-e MYSQL_ROOT_PASSWORD=root \
+		-e MYSQL_DATABASE=trandenden \
+		-e MYSQL_USER=transcendence \
+		-e MYSQL_PASSWORD=transcendence \
+		mariadb:latest >/dev/null 2>&1
+	@sleep 3
 
-start: _mongo _mariadb
+start: _mariadb
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	(cd backend && npm run dev 2>&1 | while IFS= read -r line; do printf "\033[0;34m[BACKEND]\033[0m  %s\n" "$$line"; done) & \
-	(cd frontend && npm run dev 2>&1 | while IFS= read -r line; do printf "\033[0;36m[FRONTEND]\033[0m %s\n" "$$line"; done) & \
+	(cd backend && PORT=$(BACKEND_PORT) DB_HOST=mariadb npm run dev 2>&1 | while IFS= read -r line; do printf "$(BLUE)[BACKEND]$(NC)  %s\n" "$$line"; done) & \
+	(cd frontend && npm run dev 2>&1 | while IFS= read -r line; do printf "$(CYAN)[FRONTEND]$(NC) %s\n" "$$line"; done) & \
 	wait
 
-dev: start
-
-backend: _mongo _mariadb
-	@cd backend && npm run dev
-
-frontend:
-	@cd frontend && npm run dev
-
 stop:
-	@echo "$(RED)Stopping all servers.$(NC)"
+	@echo "$(RED)Stopping all servers$(NC)"
 	@-killall -q node 2>/dev/null || true
-	@-killall -q vite 2>/dev/null || true
+	@-docker stop $(MARIADB_CONTAINER) 2>/dev/null || true
+
+clean: stop
+	@echo "$(RED)Cleaning up Docker resources$(NC)"
+	@docker rm -f $(MARIADB_CONTAINER) 2>/dev/null || true
+	@docker network rm $(NETWORK_NAME) 2>/dev/null || true
+	@echo "$(GREEN)Cleanup complete$(NC)"
 
 restart: stop start
 
 logs:
-	@echo "$(BLUE)Docker Containers:$(NC)"
-	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "NAMES|mongo|mariadb" || echo "No containers running"
+	@echo "$(BLUE)Docker Status:$(NC)"
+	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "NAMES|mariadb" || echo "No containers running"
 	@echo ""
-	@echo "$(BLUE)Node Processes:$(NC)"
-	@ps aux | grep -E "node.*server|vite" | grep -v grep | awk '{print "  "$$11" "$$12" "$$13}' || echo "No processes running"
+	@echo "$(BLUE)MariaDB Logs:$(NC)"
+	@docker logs --tail 20 $(MARIADB_CONTAINER) 2>/dev/null || echo "Container not running"
 
 .DEFAULT_GOAL := help
