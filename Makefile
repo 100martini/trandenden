@@ -28,8 +28,6 @@ check-node:
 	@NODE_VERSION=$$(node --version | cut -d'v' -f2 | cut -d'.' -f1); \
 	if [ $$NODE_VERSION -lt 18 ]; then \
 		echo "$(RED)Error: Node.js version $$NODE_VERSION detected. Need v18 or higher.$(NC)"; \
-		echo "$(YELLOW)Install with: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash$(NC)"; \
-		echo "$(YELLOW)Then: nvm install 20 && nvm use 20$(NC)"; \
 		exit 1; \
 	else \
 		echo "$(GREEN)Node.js v$$NODE_VERSION - OK$(NC)"; \
@@ -60,7 +58,7 @@ _mariadb: _network
 start: _mariadb
 	@echo ""
 	@trap 'kill 0' EXIT; \
-	(cd backend && PORT=$(BACKEND_PORT) DB_HOST=mariadb npm run dev 2>&1 | while IFS= read -r line; do printf "$(BLUE)[BACKEND]$(NC)  %s\n" "$$line"; done) & \
+	(cd backend && npm run dev 2>&1 | while IFS= read -r line; do printf "$(BLUE)[BACKEND]$(NC)  %s\n" "$$line"; done) & \
 	(cd frontend && npm run dev 2>&1 | while IFS= read -r line; do printf "$(CYAN)[FRONTEND]$(NC) %s\n" "$$line"; done) & \
 	wait
 
@@ -80,8 +78,5 @@ restart: stop start
 logs:
 	@echo "$(BLUE)Docker Status:$(NC)"
 	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "NAMES|mariadb" || echo "No containers running"
-	@echo ""
-	@echo "$(BLUE)MariaDB Logs:$(NC)"
-	@docker logs --tail 20 $(MARIADB_CONTAINER) 2>/dev/null || echo "Container not running"
 
 .DEFAULT_GOAL := help
