@@ -311,6 +311,76 @@
   color: var(--cream);
 }
 
+/* Circle Selector Styles */
+.circle-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.circle-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  padding: 12px 16px;
+  background: var(--dark);
+  border: 2px solid rgba(185, 180, 199, 0.15);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.circle-btn:hover {
+  border-color: rgba(185, 180, 199, 0.3);
+  background: rgba(92, 84, 112, 0.2);
+}
+
+.circle-btn.active {
+  border-color: var(--cream);
+  background: rgba(250, 240, 230, 0.1);
+}
+
+.circle-btn.current {
+  position: relative;
+}
+
+.circle-btn.current::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  background: #4facfe;
+  border-radius: 50%;
+  border: 2px solid var(--darkest);
+}
+
+.circle-btn.complete {
+  border-color: rgba(144, 190, 109, 0.5);
+}
+
+.circle-btn.complete .circle-number {
+  color: #90BE6D;
+}
+
+.circle-number {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cream);
+}
+
+.circle-progress {
+  font-size: 11px;
+  color: var(--light);
+  margin-top: 4px;
+}
+
+/* Projects Grid */
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -367,6 +437,16 @@
 .badge-completed {
   background: rgba(144, 190, 109, 0.15);
   color: #90BE6D;
+}
+
+.badge-failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.badge-searching {
+  background: rgba(79, 172, 254, 0.15);
+  color: #4facfe;
 }
 
 .project-name {
@@ -464,5 +544,14 @@
   
   .projects-grid {
     grid-template-columns: 1fr;
+  }
+
+  .circle-selector {
+    justify-content: center;
+  }
+
+  .circle-btn {
+    min-width: 60px;
+    padding: 10px 12px;
   }
 }
