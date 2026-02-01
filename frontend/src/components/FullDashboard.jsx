@@ -3,15 +3,50 @@ import { useNavigate } from 'react-router-dom';
 import { removeToken } from '../utils/auth';
 import '../styles/FullDashboard.css';
 
-// 42 Common Core circle structure (project names as they appear in the API)
-const CIRCLE_PROJECTS = {
-  0: ['libft'],
-  1: ['ft_printf', 'get_next_line', 'born2beroot'],
-  2: ['push_swap', 'minitalk', 'pipex', 'so_long', 'fdf', 'fract-ol'],
-  3: ['philosophers', 'minishell'],
-  4: ['cub3d', 'minirt', 'cpp module 00', 'cpp module 01', 'cpp module 02', 'cpp module 03', 'cpp module 04', 'netpractice'],
-  5: ['ft_containers', 'webserv', 'ft_irc', 'cpp module 05', 'cpp module 06', 'cpp module 07', 'cpp module 08', 'cpp module 09', 'inception'],
-  6: ['ft_transcendence']
+// Fallback mapping of project slugs/names to circles (used if backend doesn't provide circle data)
+const PROJECT_TO_CIRCLE = {
+  // Circle 0
+  'libft': 0,
+  
+  // Circle 1
+  'ft_printf': 1, 'ft-printf': 1,
+  'get_next_line': 1,
+  'born2beroot': 1,
+  
+  // Circle 2
+  'push_swap': 2, 'push-swap': 2,
+  'minitalk': 2,
+  'pipex': 2,
+  'so_long': 2, 'so-long': 2,
+  'fdf': 2,
+  'fract-ol': 2, 'fractol': 2, '42cursus-fract-ol': 2,
+  
+  // Circle 3
+  'philosophers': 3, 'philo': 3,
+  'minishell': 3,
+  
+  // Circle 4
+  'cub3d': 4, 'cub3D': 4,
+  'minirt': 4, 'miniRT': 4,
+  'netpractice': 4, 'net_practice': 4,
+  'cpp-module-00': 4, 'cpp module 00': 4, 'CPP Module 00': 4,
+  'cpp-module-01': 4, 'cpp module 01': 4, 'CPP Module 01': 4,
+  'cpp-module-02': 4, 'cpp module 02': 4, 'CPP Module 02': 4,
+  'cpp-module-03': 4, 'cpp module 03': 4, 'CPP Module 03': 4,
+  'cpp-module-04': 4, 'cpp module 04': 4, 'CPP Module 04': 4,
+  
+  // Circle 5
+  'cpp-module-05': 5, 'cpp module 05': 5, 'CPP Module 05': 5,
+  'cpp-module-06': 5, 'cpp module 06': 5, 'CPP Module 06': 5,
+  'cpp-module-07': 5, 'cpp module 07': 5, 'CPP Module 07': 5,
+  'cpp-module-08': 5, 'cpp module 08': 5, 'CPP Module 08': 5,
+  'cpp-module-09': 5, 'cpp module 09': 5, 'CPP Module 09': 5,
+  'webserv': 5,
+  'ft_irc': 5, 'ft-irc': 5,
+  'inception': 5,
+  
+  // Circle 6
+  'ft_transcendence': 6, 'ft-transcendence': 6,
 };
 
 const FullDashboard = ({ user }) => {
@@ -27,89 +62,112 @@ const FullDashboard = ({ user }) => {
   const username = user?.login || 'yourlogin';
   const campus = user?.campus || 'Campus';
   const wallet = user?.wallet || 0;
-  const correctionPoints = user?.correctionPoints || 0;
+  const correctionPoints = user?.correctionPoints || user?.correction_point || 0;
   
   const level = user?.level || 
                 user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level ||
                 user?.cursusUsers?.[user?.cursusUsers.length - 1]?.level || 0;
                 
-  const avatarUrl = user?.avatar?.medium || user?.avatar;
+  const avatarUrl = user?.image?.link || user?.image?.versions?.medium || user?.avatar?.medium || user?.avatar;
   const allProjects = user?.projectsUsers || [];
 
-  const isExamOrPiscine = (projectName) => {
-    const name = projectName?.toLowerCase() || '';
-    return name.includes('exam') || name.includes('piscine') || name.includes('rush');
+  // Filter out exams and piscine projects
+  const isExamOrPiscine = (projectName, projectSlug) => {
+    const name = (projectName || '').toLowerCase();
+    const slug = (projectSlug || '').toLowerCase();
+    return name.includes('exam') || slug.includes('exam') || 
+           name.includes('piscine') || slug.includes('piscine') || 
+           name.includes('rush') || slug.includes('rush');
   };
 
-  const getProjectCircle = (projectName) => {
-    const name = projectName?.toLowerCase() || '';
-    for (const [circle, projects] of Object.entries(CIRCLE_PROJECTS)) {
-      if (projects.some(p => name.includes(p) || p.includes(name))) {
-        return parseInt(circle);
+  // Get circle for a project - uses backend data first, falls back to hardcoded mapping
+  const getProjectCircle = (project) => {
+    if (!project) return null;
+    
+    // First, check if backend provided circle data (from 42 API difficulty field)
+    if (project.circle !== undefined && project.circle !== null) {
+      return project.circle;
+    }
+    
+    // Fallback to hardcoded mapping
+    const slug = (project.slug || '').toLowerCase();
+    const name = (project.name || '').toLowerCase();
+    
+    // Try slug first, then name
+    if (PROJECT_TO_CIRCLE[slug] !== undefined) return PROJECT_TO_CIRCLE[slug];
+    if (PROJECT_TO_CIRCLE[name] !== undefined) return PROJECT_TO_CIRCLE[name];
+    
+    // Try partial matches
+    for (const [key, circle] of Object.entries(PROJECT_TO_CIRCLE)) {
+      if (slug.includes(key) || name.includes(key) || key.includes(slug) || key.includes(name)) {
+        return circle;
       }
     }
-    return -1; 
+    
+    return null;
   };
 
-  const { currentCircle, circleProjects, circleStats } = useMemo(() => {
-    const cursusProjects = allProjects.filter(p => {
-      const cursusIds = p.cursus_ids || [];
-      return cursusIds.includes(21) || (p.project?.parent_id === null && !isExamOrPiscine(p.project?.name));
-    });
-
-    const nonExamProjects = cursusProjects.filter(p => !isExamOrPiscine(p.project?.name));
-
+  // Process projects
+  const { currentCircle, circleProjects, availableCircles } = useMemo(() => {
     const projectsByCircle = {};
-    for (let i = 0; i <= 6; i++) {
-      projectsByCircle[i] = [];
-    }
+    let maxCircle = 0;
+    let currentCircleValue = 0;
 
-    nonExamProjects.forEach(p => {
-      const circle = getProjectCircle(p.project?.name);
-      if (circle >= 0 && circle <= 6) {
-        projectsByCircle[circle].push(p);
+    allProjects.forEach(p => {
+      // Skip exams and piscines
+      if (isExamOrPiscine(p.project?.name, p.project?.slug)) return;
+      
+      // Only include 42cursus projects (cursus_id 21)
+      if (p.cursus_ids && !p.cursus_ids.includes(21)) return;
+      
+      const circle = getProjectCircle(p.project);
+      if (circle === null) return; // Skip if we can't determine the circle
+      
+      if (!projectsByCircle[circle]) {
+        projectsByCircle[circle] = [];
+      }
+      projectsByCircle[circle].push(p);
+      
+      if (circle > maxCircle) {
+        maxCircle = circle;
+      }
+
+      // Current circle = highest with in-progress
+      const isInProgress = p.status === 'in_progress' || p.status === 'searching_a_group';
+      if (isInProgress && circle > currentCircleValue) {
+        currentCircleValue = circle;
       }
     });
 
-    let current = 0;
-    for (let i = 6; i >= 0; i--) {
-      const circleProjectsList = projectsByCircle[i];
-      const hasInProgress = circleProjectsList.some(p => 
-        p.status === 'in_progress' || p.status === 'searching_a_group'
-      );
-      const hasValidated = circleProjectsList.some(p => 
-        p.status === 'finished' && p['validated?']
-      );
-      
-      if (hasInProgress) {
-        current = i;
-        break;
-      }
-      if (hasValidated && current < i) {
-        current = i;
-      }
+    // If no in-progress, current = highest with activity
+    if (currentCircleValue === 0 && Object.keys(projectsByCircle).length > 0) {
+      currentCircleValue = Math.max(...Object.keys(projectsByCircle).map(Number));
     }
 
-    const stats = {};
-    for (let i = 0; i <= 6; i++) {
-      const projects = projectsByCircle[i];
-      stats[i] = {
-        total: CIRCLE_PROJECTS[i].length,
-        completed: projects.filter(p => p.status === 'finished' && p['validated?']).length,
-        inProgress: projects.filter(p => p.status === 'in_progress' || p.status === 'searching_a_group').length,
-        failed: projects.filter(p => p.status === 'finished' && !p['validated?']).length
-      };
-    }
+    const available = Object.keys(projectsByCircle)
+      .map(Number)
+      .sort((a, b) => a - b);
 
     return {
-      currentCircle: current,
+      currentCircle: currentCircleValue,
       circleProjects: projectsByCircle,
-      circleStats: stats
+      availableCircles: available
     };
   }, [allProjects]);
 
+  // Use selected circle or default to current circle
   const activeCircle = selectedCircle !== null ? selectedCircle : currentCircle;
   const displayProjects = circleProjects[activeCircle] || [];
+
+  // Calculate stats for a circle
+  const getCircleStats = (circle) => {
+    const projects = circleProjects[circle] || [];
+    return {
+      total: projects.length,
+      completed: projects.filter(p => p.status === 'finished' && p['validated?']).length,
+      inProgress: projects.filter(p => p.status === 'in_progress' || p.status === 'searching_a_group').length,
+    };
+  };
 
   const getInitials = (name) => {
     if (!name) return 'YO';
@@ -146,23 +204,16 @@ const FullDashboard = ({ user }) => {
     return { class: 'badge-active', text: project.status };
   };
 
-  const getProjectColor = (projectName) => {
-    const colors = [
-      'linear-gradient(135deg, #667eea, #764ba2)',
-      'linear-gradient(135deg, #f093fb, #f5576c)',
-      'linear-gradient(135deg, #4facfe, #00f2fe)',
-      'linear-gradient(135deg, #43e97b, #38f9d7)',
-      'linear-gradient(135deg, #fa709a, #fee140)',
-      'linear-gradient(135deg, #a8edea, #fed6e3)',
-      'linear-gradient(135deg, #d299c2, #fef9d7)',
-      'linear-gradient(135deg, #89f7fe, #66a6ff)',
-    ];
-    const index = (projectName?.length || 0) % colors.length;
-    return colors[index];
-  };
+  // Overall stats from user's actual projects only
+  const totalActive = Object.values(circleProjects).flat().filter(p => 
+    p.status === 'in_progress' || p.status === 'searching_a_group'
+  ).length;
+  
+  const totalCompleted = Object.values(circleProjects).flat().filter(p => 
+    p.status === 'finished' && p['validated?']
+  ).length;
 
-  const totalActive = Object.values(circleStats).reduce((sum, s) => sum + s.inProgress, 0);
-  const totalCompleted = Object.values(circleStats).reduce((sum, s) => sum + s.completed, 0);
+  const activeStats = getCircleStats(activeCircle);
 
   return (
     <div className="full-dashboard">
@@ -271,79 +322,77 @@ const FullDashboard = ({ user }) => {
           <h2>Circle Projects</h2>
         </div>
 
-        <div className="circle-selector">
-          {[0, 1, 2, 3, 4, 5, 6].map(circle => {
-            const stats = circleStats[circle];
-            const isComplete = stats.completed >= stats.total && stats.total > 0;
-            const hasActivity = stats.completed > 0 || stats.inProgress > 0;
-            
-            return (
-              <button
-                key={circle}
-                className={`circle-btn ${activeCircle === circle ? 'active' : ''} ${isComplete ? 'complete' : ''} ${circle === currentCircle ? 'current' : ''}`}
-                onClick={() => setSelectedCircle(circle)}
-              >
-                <span className="circle-number">{circle}</span>
-                {hasActivity && (
-                  <span className="circle-progress">
-                    {stats.completed}/{stats.total}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Projects Grid */}
-        <div className="section-header" style={{ marginTop: '24px' }}>
-          <h2>Circle {activeCircle} Projects</h2>
-          <span style={{ color: 'var(--light)', fontSize: '14px' }}>
-            {circleStats[activeCircle]?.completed || 0}/{circleStats[activeCircle]?.total || 0} completed
-          </span>
-        </div>
-
-        {displayProjects.length > 0 ? (
-          <div className="projects-grid">
-            {displayProjects.map((project, index) => {
-              const badge = getStatusBadge(project);
-              return (
-                <div key={project.id || index} className="project-card">
-                  <div className="project-header">
-                    <div 
-                      className="project-icon"
-                      style={{ background: getProjectColor(project.project?.name) }}
-                    >
-                      {(project.project?.name || 'P').substring(0, 2).toUpperCase()}
-                    </div>
-                    <span className={`project-badge ${badge.class}`}>
-                      {badge.text}
+        {availableCircles.length > 0 ? (
+          <>
+            <div className="circle-selector">
+              {availableCircles.map(circle => {
+                const stats = getCircleStats(circle);
+                const isComplete = stats.completed === stats.total && stats.total > 0;
+                
+                return (
+                  <button
+                    key={circle}
+                    className={`circle-btn ${activeCircle === circle ? 'active' : ''} ${isComplete ? 'complete' : ''} ${circle === currentCircle ? 'current' : ''}`}
+                    onClick={() => setSelectedCircle(circle)}
+                  >
+                    <span className="circle-number">{circle}</span>
+                    <span className="circle-progress">
+                      {stats.completed}/{stats.total}
                     </span>
-                  </div>
-                  <div className="project-name">{project.project?.name || 'Unknown Project'}</div>
-                  <div className="project-members">
-                    {project.status === 'finished' 
-                      ? (project['validated?'] ? 'Validated' : 'Not validated')
-                      : project.status?.replace(/_/g, ' ')
-                    }
-                  </div>
-                  {project.status === 'finished' && project.final_mark !== null && (
-                    <div className="project-grade">
-                      Final Grade: <strong>{project.final_mark}%</strong>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Projects Grid */}
+            <div className="section-header" style={{ marginTop: '24px' }}>
+              <h2>Circle {activeCircle}</h2>
+              <span style={{ color: 'var(--light)', fontSize: '14px' }}>
+                {activeStats.completed}/{activeStats.total} completed
+              </span>
+            </div>
+
+            {displayProjects.length > 0 ? (
+              <div className="projects-grid">
+                {displayProjects.map((project, index) => {
+                  const badge = getStatusBadge(project);
+                  return (
+                    <div key={project.id || index} className="project-card">
+                      <div className="project-header">
+                        <div className="project-icon">
+                          {(project.project?.name || 'P').substring(0, 2).toUpperCase()}
+                        </div>
+                        <span className={`project-badge ${badge.class}`}>
+                          {badge.text}
+                        </span>
+                      </div>
+                      <div className="project-name">{project.project?.name || 'Unknown Project'}</div>
+                      <div className="project-status">
+                        {project.status === 'finished' 
+                          ? (project['validated?'] ? 'Validated' : 'Not validated')
+                          : project.status?.replace(/_/g, ' ')
+                        }
+                      </div>
+                      {project.status === 'finished' && project.final_mark !== null && (
+                        <div className="project-grade">
+                          Final Grade: <strong>{project.final_mark}%</strong>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <h3>No Projects in Circle {activeCircle}</h3>
+                <p>You haven't started any projects in this circle yet.</p>
+              </div>
+            )}
+          </>
         ) : (
           <div className="empty-state">
-            <h3>No Projects in Circle {activeCircle}</h3>
-            <p>You haven't started any projects in this circle yet.</p>
-            {activeCircle > currentCircle && (
-              <p style={{ marginTop: '8px', fontSize: '13px', color: 'var(--light)' }}>
-                Complete previous circles to unlock these projects.
-              </p>
-            )}
+            <h3>No Projects Found</h3>
+            <p>Start your 42 journey by registering for projects on the intranet.</p>
           </div>
         )}
 

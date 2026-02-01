@@ -25,6 +25,9 @@ const userSchema = new mongoose.Schema({
     medium: String,
     large: String
   },
+  image: {
+    type: mongoose.Schema.Types.Mixed
+  },
   campus: String,
   cursus: [String],
   wallet: {
@@ -32,6 +35,10 @@ const userSchema = new mongoose.Schema({
     default: 0
   },
   correctionPoints: {
+    type: Number,
+    default: 0
+  },
+  correction_point: {
     type: Number,
     default: 0
   },
@@ -72,7 +79,6 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-//WARNING! sensitive content. dont send them okay?
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.accessToken;

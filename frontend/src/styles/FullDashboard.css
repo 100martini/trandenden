@@ -340,7 +340,7 @@
 
 .circle-btn.active {
   border-color: var(--cream);
-  background: rgba(250, 240, 230, 0.1);
+  background: rgba(250, 240, 230, 0.08);
 }
 
 .circle-btn.current {
@@ -354,17 +354,17 @@
   right: -4px;
   width: 10px;
   height: 10px;
-  background: #4facfe;
+  background: var(--cream);
   border-radius: 50%;
   border: 2px solid var(--darkest);
 }
 
 .circle-btn.complete {
-  border-color: rgba(144, 190, 109, 0.5);
+  border-color: rgba(185, 180, 199, 0.4);
 }
 
 .circle-btn.complete .circle-number {
-  color: #90BE6D;
+  color: var(--cream);
 }
 
 .circle-number {
@@ -394,7 +394,6 @@
   border-radius: 16px;
   padding: 24px;
   transition: all 0.2s;
-  cursor: pointer;
 }
 
 .project-card:hover {
@@ -418,35 +417,37 @@
   justify-content: center;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
+  background: linear-gradient(135deg, var(--light), var(--cream));
   color: var(--dark);
+  border: 1px solid rgba(185, 180, 199, 0.15);
 }
 
 .project-badge {
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 8px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .badge-active {
-  background: rgba(185, 180, 199, 0.15);
+  background: rgba(185, 180, 199, 0.12);
   color: var(--light);
 }
 
 .badge-completed {
-  background: rgba(144, 190, 109, 0.15);
-  color: #90BE6D;
+  background: rgba(185, 180, 199, 0.15);
+  color: var(--cream);
 }
 
 .badge-failed {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
 }
 
 .badge-searching {
-  background: rgba(79, 172, 254, 0.15);
-  color: #4facfe;
+  background: rgba(185, 180, 199, 0.12);
+  color: var(--light);
 }
 
 .project-name {
@@ -454,10 +455,10 @@
   font-weight: 600;
   font-size: 16px;
   color: var(--cream);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
-.project-members {
+.project-status {
   font-size: 13px;
   color: var(--light);
   margin-bottom: 12px;
@@ -466,8 +467,11 @@
 
 .project-grade {
   font-size: 13px;
+  color: var(--light);
+}
+
+.project-grade strong {
   color: var(--cream);
-  font-weight: 500;
 }
 
 .empty-state {
@@ -490,15 +494,6 @@
 .empty-state p {
   font-size: 14px;
   color: var(--light);
-}
-
-.empty-state code {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: 12px;
-  color: var(--cream);
 }
 
 @media (max-width: 1400px) {
