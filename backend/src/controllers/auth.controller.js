@@ -3,10 +3,48 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const oauthConfig = require('../config/oauth.config');
 
+// Cache for cursus projects
+let cursusProjectsCache = null;
+let cursusProjectsCacheTime = null;
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Fetch all projects for a cursus from 42 API
+async function fetchCursusProjects(accessToken, cursusId = 21) {
+  const allProjects = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (page <= 10) { // Safety limit
+    try {
+      const response = await axios.get(`${oauthConfig.apiURL}/cursus/${cursusId}/projects`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        params: { page, per_page: perPage }
+      });
+
+      const projects = response.data;
+      if (!projects || projects.length === 0) break;
+
+      allProjects.push(...projects);
+      console.log(`Fetched page ${page}: ${projects.length} projects (total: ${allProjects.length})`);
+
+      if (projects.length < perPage) break;
+      page++;
+
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.error(`Error fetching projects page ${page}:`, error.message);
+      break;
+    }
+  }
+
+  return allProjects;
+}
+
 class AuthController {
   async redirectTo42(req, res) {
     try {
-      const state = Math.random().toString(36).substring(7); //CSRF
+      const state = Math.random().toString(36).substring(7);
       
       const params = new URLSearchParams({
         client_id: oauthConfig.clientId,
@@ -64,6 +102,10 @@ class AuthController {
       console.log('Projects count:', profile.projects_users?.length || 0);
       console.log('Cursus count:', profile.cursus_users?.length || 0);
 
+      // Store projects directly - circle mapping is done in frontend
+      const projectsUsers = profile.projects_users || [];
+      console.log('Projects stored:', projectsUsers.length);
+
       let user = await User.findOne({ intraId: profile.id });
 
       const userData = {
@@ -78,15 +120,17 @@ class AuthController {
           medium: profile.image?.versions?.medium,
           large: profile.image?.versions?.large
         },
+        image: profile.image,
         campus: profile.campus?.[0]?.name,
         cursus: profile.cursus_users?.map(c => c.cursus.name) || [],
         wallet: profile.wallet,
         correctionPoints: profile.correction_point,
+        correction_point: profile.correction_point,
         
         level: profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
                profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0,
         cursusUsers: profile.cursus_users || [],
-        projectsUsers: profile.projects_users || [],
+        projectsUsers: projectsUsers,
         achievements: profile.achievements || [],
         coalition: profile.coalitions?.[0],
         
@@ -136,31 +180,35 @@ class AuthController {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      //just checking if data is stale (older than 1 hour)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      if (user.lastSyncedAt < oneHourAgo && user.accessToken) {
+      if (user.lastSyncedAt < oneHourAgo) {
         console.log('Data is stale, fetching fresh data from 42 API...');
         
         try {
           const fullUser = await User.findById(req.userId);
-          const response = await axios.get(`${oauthConfig.apiURL}/me`, {
-            headers: { 'Authorization': `Bearer ${fullUser.accessToken}` }
-          });
-          
+          if (fullUser.accessToken) {
+            const response = await axios.get(`${oauthConfig.apiURL}/me`, {
+              headers: { 'Authorization': `Bearer ${fullUser.accessToken}` }
+            });
+            
           const profile = response.data;
-          
-          user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
-                       profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
-          user.cursusUsers = profile.cursus_users || [];
-          user.projectsUsers = profile.projects_users || [];
-          user.achievements = profile.achievements || [];
-          user.wallet = profile.wallet;
-          user.correctionPoints = profile.correction_point;
-          user.lastSyncedAt = new Date();
-          
-          await user.save();
-          
-          console.log('Fresh data fetched and saved');
+
+            // Store projects directly - circle mapping is done in frontend
+            user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
+                         profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
+            user.cursusUsers = profile.cursus_users || [];
+            user.projectsUsers = profile.projects_users || [];
+            user.achievements = profile.achievements || [];
+            user.wallet = profile.wallet;
+            user.correctionPoints = profile.correction_point;
+            user.correction_point = profile.correction_point;
+            user.image = profile.image;
+            user.lastSyncedAt = new Date();
+            
+            await user.save();
+            
+            console.log('Fresh data fetched and saved');
+          }
         } catch (syncError) {
           console.error('Failed to sync data:', syncError.message);
         }
@@ -193,7 +241,8 @@ class AuthController {
       });
       
       const profile = response.data;
-      
+
+      // Store projects directly - circle mapping is done in frontend
       user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
                    profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
       user.cursusUsers = profile.cursus_users || [];
@@ -201,12 +250,14 @@ class AuthController {
       user.achievements = profile.achievements || [];
       user.wallet = profile.wallet;
       user.correctionPoints = profile.correction_point;
+      user.correction_point = profile.correction_point;
       user.campus = profile.campus?.[0]?.name;
       user.avatar = {
         small: profile.image?.versions?.small,
         medium: profile.image?.versions?.medium,
         large: profile.image?.versions?.large
       };
+      user.image = profile.image;
       user.lastSyncedAt = new Date();
       
       await user.save();
@@ -245,6 +296,38 @@ class AuthController {
       message: 'Auth system is running',
       timestamp: new Date().toISOString()
     });
+  }
+
+  // Get all projects for 42cursus (kept for potential future use)
+  async getCursusProjects(req, res) {
+    try {
+      // Check cache first
+      if (cursusProjectsCache && cursusProjectsCacheTime && 
+          (Date.now() - cursusProjectsCacheTime < CACHE_DURATION)) {
+        return res.json(cursusProjectsCache);
+      }
+
+      const user = await User.findById(req.userId);
+      if (!user || !user.accessToken) {
+        return res.status(400).json({ error: 'No access token available' });
+      }
+
+      const projects = await fetchCursusProjects(user.accessToken, 21);
+
+      // Cache results
+      cursusProjectsCache = {
+        projects,
+        count: projects.length,
+        fetchedAt: new Date().toISOString()
+      };
+      cursusProjectsCacheTime = Date.now();
+
+      res.json(cursusProjectsCache);
+
+    } catch (error) {
+      console.error('Get cursus projects error:', error.message);
+      res.status(500).json({ error: 'Failed to fetch cursus projects' });
+    }
   }
 }
 

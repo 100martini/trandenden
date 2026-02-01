@@ -7,6 +7,24 @@
   --cream: #FAF0E6;
 }
 
+/* Custom scrollbar */
+.main::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main::-webkit-scrollbar-track {
+  background: var(--darkest);
+}
+
+.main::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.main::-webkit-scrollbar-thumb:hover {
+  background: var(--light);
+}
+
 .full-dashboard {
   display: flex;
   min-height: 100vh;
@@ -174,6 +192,8 @@
   margin-left: 260px;
   padding: 32px;
   min-height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
 }
 
 .header {
@@ -327,24 +347,28 @@
   min-width: 70px;
   padding: 12px 16px;
   background: var(--dark);
-  border: 2px solid rgba(185, 180, 199, 0.15);
+  border: 2px solid rgba(185, 180, 199, 0.1);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
+  opacity: 0.4;
 }
 
 .circle-btn:hover {
-  border-color: rgba(185, 180, 199, 0.3);
-  background: rgba(92, 84, 112, 0.2);
+  opacity: 0.7;
+  border-color: rgba(185, 180, 199, 0.2);
+  background: rgba(92, 84, 112, 0.15);
 }
 
 .circle-btn.active {
+  opacity: 1;
   border-color: var(--cream);
   background: rgba(250, 240, 230, 0.08);
 }
 
 .circle-btn.current {
   position: relative;
+  opacity: 1;
 }
 
 .circle-btn.current::after {
@@ -360,11 +384,34 @@
 }
 
 .circle-btn.complete {
-  border-color: rgba(185, 180, 199, 0.4);
+  opacity: 0.5;
+  border-color: rgba(185, 180, 199, 0.25);
+}
+
+.circle-btn.complete:hover {
+  opacity: 0.8;
+}
+
+.circle-btn.complete.active {
+  opacity: 1;
 }
 
 .circle-btn.complete .circle-number {
   color: var(--cream);
+}
+
+.circle-btn.outer-core-btn {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.circle-btn.outer-core-btn:hover {
+  opacity: 0.85;
+}
+
+.circle-btn.outer-core-btn.active {
+  opacity: 1;
+  border-style: solid;
 }
 
 .circle-number {
@@ -418,8 +465,8 @@
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
   font-size: 14px;
-  background: linear-gradient(135deg, var(--light), var(--cream));
-  color: var(--dark);
+  background: var(--accent);
+  color: var(--cream);
   border: 1px solid rgba(185, 180, 199, 0.15);
 }
 
@@ -521,6 +568,8 @@
   .main {
     margin-left: 80px;
     padding: 24px 16px;
+    max-height: 100vh;
+    overflow-y: auto;
   }
   
   .logo-text,
