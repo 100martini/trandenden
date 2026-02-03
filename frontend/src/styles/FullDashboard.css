@@ -1074,3 +1074,132 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.empty-teams {
+  background: var(--dark);
+  border: 1px dashed rgba(185, 180, 199, 0.15);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.empty-teams p {
+  color: var(--light);
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.teams-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.team-card {
+  background: var(--dark);
+  border: 1px solid rgba(185, 180, 199, 0.08);
+  border-radius: 16px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.team-card:hover {
+  border-color: rgba(185, 180, 199, 0.2);
+  transform: translateY(-2px);
+}
+
+.team-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.team-avatars {
+  display: flex;
+}
+
+.team-header-avatar,
+.team-header-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid var(--dark);
+  margin-left: -10px;
+}
+
+.team-header-avatar:first-child,
+.team-header-placeholder:first-child {
+  margin-left: 0;
+}
+
+.team-header-avatar {
+  object-fit: cover;
+}
+
+.team-header-placeholder {
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cream);
+}
+
+.team-delete {
+  background: none;
+  border: none;
+  color: var(--light);
+  cursor: pointer;
+  padding: 8px;
+  opacity: 0;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.team-card:hover .team-delete {
+  opacity: 1;
+}
+
+.team-delete:hover {
+  color: #f87171;
+}
+
+.project-card.has-team {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.project-card.has-team:hover {
+  transform: none;
+  border-color: rgba(185, 180, 199, 0.08);
+}
+
+.team-info {
+  flex: 1;
+}
+
+.team-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--cream);
+  margin-bottom: 4px;
+}
+
+.team-project {
+  font-size: 13px;
+  color: var(--light);
+}
+
+@media (max-width: 768px) {
+  .teams-grid {
+    grid-template-columns: 1fr;
+  }
+}

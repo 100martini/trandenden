@@ -112,6 +112,15 @@ const FullDashboard = ({ user }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [myTeams, setMyTeams] = useState(() => {
+    const saved = sessionStorage.getItem('myTeams');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const saveTeams = (teams) => {
+    setMyTeams(teams);
+    sessionStorage.setItem('myTeams', JSON.stringify(teams));
+  };
 
   const handleLogout = useCallback(() => {
     removeToken();
@@ -275,6 +284,11 @@ const FullDashboard = ({ user }) => {
 
   const handleProjectClick = (project) => {
     if (project.team > 1) {
+      const existingTeam = myTeams.find(t => t.project.slug === project.slug);
+      if (existingTeam) {
+        navigate(`/kanban/${project.slug}`);
+        return;
+      }
       setSelectedProject(project);
       setShowCreateTeam(true);
     } else {
@@ -282,12 +296,30 @@ const FullDashboard = ({ user }) => {
     }
   };
 
+  const deleteTeam = (teamId, e) => {
+    e.stopPropagation();
+    const updated = myTeams.filter(t => t.id !== teamId);
+    saveTeams(updated);
+  };
+
   const handleTeamCreated = () => {
+    if (!canCreateTeam) return;
+    
+    const newTeam = {
+      id: Date.now(),
+      name: teamName,
+      project: selectedProject,
+      members: [{ login: username, avatar: avatarUrl }, ...selectedMembers],
+      createdAt: new Date()
+    };
+    
+    saveTeams([...myTeams, newTeam]);
     setShowCreateTeam(false);
     resetTeamModal();
-    if (selectedProject) {
-      navigate(`/kanban/${selectedProject.slug}`);
-    }
+  };
+
+  const goToTeamKanban = (team) => {
+    navigate(`/kanban/${team.project.slug}`);
   };
 
   const closeModal = () => {
@@ -345,9 +377,6 @@ const FullDashboard = ({ user }) => {
 
         <nav className="nav-section">
           <a href="#" className="nav-item active">Dashboard</a>
-          <a href="#" className="nav-item">Projects</a>
-          <a href="#" className="nav-item">Tasks</a>
-          <a href="#" className="nav-item">Documents</a>
         </nav>
 
         <div className="nav-divider"></div>
@@ -417,7 +446,7 @@ const FullDashboard = ({ user }) => {
               <div className="info-value">{grade}</div>
             </div>
             <div className="info-item">
-              <div className="info-label">Circle</div>
+              <div className="info-label">Milestone</div>
               <div className="info-value">{currentCircle}</div>
             </div>
           </div>
@@ -426,25 +455,25 @@ const FullDashboard = ({ user }) => {
         {isCadet && (
           <>
             <div className="section-header">
-              <h2>Circles</h2>
+              <h2>Milestones</h2>
             </div>
 
             <div className="circle-selector">
-              {[0, 1, 2, 3, 4, 5, 6].map(circle => {
-                const stats = getCircleStats(circle);
-                const isLocked = curriculum === 'unknown' && circle > 1;
-                const isCurrent = circle === currentCircle;
-                const isCompleted = circle < currentCircle;
-                const isActive = circle === activeCircle;
+              {[0, 1, 2, 3, 4, 5, 6].map(milestone => {
+                const stats = getCircleStats(milestone);
+                const isLocked = curriculum === 'unknown' && milestone > 1;
+                const isCurrent = milestone === currentCircle;
+                const isCompleted = milestone < currentCircle;
+                const isActive = milestone === activeCircle;
                 
                 return (
                   <button
-                    key={circle}
+                    key={milestone}
                     className={`circle-btn ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''} ${isCompleted ? 'complete' : ''} ${isLocked ? 'locked' : ''}`}
-                    onClick={() => !isLocked && setSelectedCircle(circle)}
+                    onClick={() => !isLocked && setSelectedCircle(milestone)}
                     disabled={isLocked}
                   >
-                    <span className="circle-number">{circle}</span>
+                    <span className="circle-number">{milestone}</span>
                     {!isLocked && (
                       <span className="circle-progress">{stats.completed}/{stats.total}</span>
                     )}
@@ -460,24 +489,25 @@ const FullDashboard = ({ user }) => {
             )}
 
             <div className="section-header">
-              <h2>Circle {activeCircle} Projects</h2>
+              <h2>Milestone {activeCircle} Projects</h2>
             </div>
 
             <div className="projects-grid">
               {circleProjects.map((project, idx) => {
                 const badge = getStatusBadge(project.userStatus);
+                const hasTeam = project.team > 1 && myTeams.some(t => t.project.slug === project.slug);
                 return (
                   <div 
                     key={idx} 
-                    className="project-card"
-                    onClick={() => handleProjectClick(project)}
+                    className={`project-card ${hasTeam ? 'has-team' : ''}`}
+                    onClick={() => !hasTeam && handleProjectClick(project)}
                   >
                     <div className="project-header">
                       <div className="project-icon">
                         {project.name.substring(0, 2).toUpperCase()}
                       </div>
                       <span className={`project-badge ${badge.className}`}>
-                        {badge.text}
+                        {hasTeam ? 'Team Created' : badge.text}
                       </span>
                     </div>
                     <div className="project-name">{project.name}</div>
@@ -488,6 +518,45 @@ const FullDashboard = ({ user }) => {
                 );
               })}
             </div>
+
+            <div className="section-header">
+              <h2>My Teams</h2>
+            </div>
+
+            {myTeams.length === 0 ? (
+              <div className="empty-teams">
+                <p>No teams yet. Create a team by clicking on a team project above.</p>
+              </div>
+            ) : (
+              <div className="teams-grid">
+                {myTeams.map(team => (
+                  <div key={team.id} className="team-card" onClick={() => goToTeamKanban(team)}>
+                    <div className="team-header">
+                      <div className="team-avatars">
+                        {team.members.slice(0, 3).map((member, idx) => (
+                          member.avatar ? (
+                            <img key={idx} src={member.avatar} alt={member.login} className="team-header-avatar" title={member.login} />
+                          ) : (
+                            <div key={idx} className="team-header-placeholder" title={member.login}>
+                              {member.login.slice(0, 2).toUpperCase()}
+                            </div>
+                          )
+                        ))}
+                      </div>
+                      <div className="team-info">
+                        <div className="team-name">{team.name}</div>
+                        <div className="team-project">{team.project.name}</div>
+                      </div>
+                      <button className="team-delete" onClick={(e) => deleteTeam(team.id, e)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
