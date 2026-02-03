@@ -1,8 +1,8 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import AuthSuccess from './pages/AuthSuccess';
 import Dashboard from './pages/Dashboard';
+import ProjectKanban from './pages/ProjectKanban';
 import { isAuthenticated } from './utils/auth';
 
 const ProtectedRoute = ({ children }) => {
@@ -13,11 +13,9 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* public-routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
         
-        {/* protected-routes */}
         <Route 
           path="/dashboard" 
           element={
@@ -27,10 +25,25 @@ function App() {
           } 
         />
         
-        {/* default-route */}
-        <Route path="/" element={<Navigate to="/login" />} />
+        <Route 
+          path="/project/:projectId" 
+          element={
+            <ProtectedRoute>
+              <ProjectKanban />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/kanban/:slug" 
+          element={
+            <ProtectedRoute>
+              <ProjectKanban />
+            </ProtectedRoute>
+          } 
+        />
         
-        {/* 404-route */}
+        <Route path="/" element={<Navigate to="/login" />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </Router>

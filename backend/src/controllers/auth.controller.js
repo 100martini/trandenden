@@ -3,49 +3,78 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
 const oauthConfig = require('../config/oauth.config');
 
-// Cache for cursus projects
-let cursusProjectsCache = null;
-let cursusProjectsCacheTime = null;
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+async function fetchUserQuests(accessToken, intraId) {
+  try {
+    const response = await axios.get(`${oauthConfig.apiURL}/users/${intraId}/quests_users`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      params: { per_page: 100 }
+    });
+    return response.data || [];
+  } catch (error) {
+    return [];
+  }
+}
 
-// Fetch all projects for a cursus from 42 API
-async function fetchCursusProjects(accessToken, cursusId = 21) {
-  const allProjects = [];
-  let page = 1;
-  const perPage = 100;
-
-  while (page <= 10) { // Safety limit
-    try {
-      const response = await axios.get(`${oauthConfig.apiURL}/cursus/${cursusId}/projects`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-        params: { page, per_page: perPage }
-      });
-
-      const projects = response.data;
-      if (!projects || projects.length === 0) break;
-
-      allProjects.push(...projects);
-      console.log(`Fetched page ${page}: ${projects.length} projects (total: ${allProjects.length})`);
-
-      if (projects.length < perPage) break;
-      page++;
-
-      // Rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-    } catch (error) {
-      console.error(`Error fetching projects page ${page}:`, error.message);
-      break;
+function calculateCurrentCircle(questsUsers) {
+  if (!questsUsers || questsUsers.length === 0) return 0;
+  let highestCompletedCircle = -1;
+  for (const qu of questsUsers) {
+    if (!qu.validated_at || !qu.quest) continue;
+    const slug = qu.quest.slug || '';
+    const match = slug.match(/common-core-rank-(\d+)/);
+    if (match) {
+      const circleNum = parseInt(match[1], 10);
+      if (circleNum > highestCompletedCircle) {
+        highestCompletedCircle = circleNum;
+      }
     }
   }
+  return highestCompletedCircle + 1;
+}
 
-  return allProjects;
+function detectCurriculum(projectsUsers) {
+  if (!projectsUsers || projectsUsers.length === 0) return 'unknown';
+  
+  const projectSlugs = projectsUsers.map(p => (p.project?.slug || '').toLowerCase());
+  
+  const hasBorn2beroot = projectSlugs.some(s => s.includes('born2beroot'));
+  const hasPushSwap = projectSlugs.some(s => s.includes('push_swap') || s.includes('push-swap'));
+  const hasCppModule = projectSlugs.some(s => s.includes('cpp-module') || s.includes('cpp_module'));
+  const hasPythonModule = projectSlugs.some(s => s.includes('python'));
+  const hasAMazeIng = projectSlugs.some(s => s.includes('maze'));
+  
+  if (hasCppModule) return 'old';
+  if (hasPythonModule || hasAMazeIng) return 'new';
+  
+  if (hasBorn2beroot && !hasPushSwap) return 'old';
+  if (hasPushSwap && !hasBorn2beroot) return 'new';
+  
+  const born2berootProject = projectsUsers.find(p => 
+    (p.project?.slug || '').toLowerCase().includes('born2beroot')
+  );
+  const pushSwapProject = projectsUsers.find(p => 
+    (p.project?.slug || '').toLowerCase().includes('push_swap') ||
+    (p.project?.slug || '').toLowerCase().includes('push-swap')
+  );
+  
+  if (born2berootProject && pushSwapProject) {
+    const born2berootDate = new Date(born2berootProject.created_at);
+    const pushSwapDate = new Date(pushSwapProject.created_at);
+    return born2berootDate < pushSwapDate ? 'old' : 'new';
+  }
+  
+  return 'unknown';
+}
+
+function getGrade(cursusUsers) {
+  const cursus42 = cursusUsers?.find(c => c.cursus?.slug === '42cursus' || c.cursus_id === 21);
+  return cursus42?.grade || null;
 }
 
 class AuthController {
   async redirectTo42(req, res) {
     try {
       const state = Math.random().toString(36).substring(7);
-      
       const params = new URLSearchParams({
         client_id: oauthConfig.clientId,
         redirect_uri: oauthConfig.redirectUri,
@@ -53,9 +82,7 @@ class AuthController {
         scope: 'public',
         state: state
       });
-
       const authUrl = `${oauthConfig.authorizationURL}?${params.toString()}`;
-      
       console.log('Redirecting to 42 OAuth...');
       res.redirect(authUrl);
     } catch (error) {
@@ -66,21 +93,19 @@ class AuthController {
 
   async handleCallback(req, res) {
     try {
-      const { code, state, error } = req.query;
+      const { code, error } = req.query;
 
       if (error) {
-        console.log('User denied access:', error);
         return res.redirect(`${process.env.FRONTEND_URL}/login?error=access_denied`);
       }
 
       if (!code) {
-        console.log('No authorization code provided');
         return res.redirect(`${process.env.FRONTEND_URL}/login?error=no_code`);
       }
 
       console.log('Authorization code received');
-
       console.log('Exchanging code for access token...');
+      
       const tokenResponse = await axios.post(oauthConfig.tokenURL, {
         grant_type: 'authorization_code',
         client_id: oauthConfig.clientId,
@@ -100,11 +125,17 @@ class AuthController {
       const profile = userResponse.data;
       console.log('User profile received:', profile.login);
       console.log('Projects count:', profile.projects_users?.length || 0);
-      console.log('Cursus count:', profile.cursus_users?.length || 0);
 
-      // Store projects directly - circle mapping is done in frontend
-      const projectsUsers = profile.projects_users || [];
-      console.log('Projects stored:', projectsUsers.length);
+      console.log('Fetching quest data...');
+      const questsUsers = await fetchUserQuests(access_token, profile.id);
+      const currentCircle = calculateCurrentCircle(questsUsers);
+      const curriculum = detectCurriculum(profile.projects_users);
+      const grade = getGrade(profile.cursus_users);
+      
+      console.log('Quests found:', questsUsers.length);
+      console.log('Current circle:', currentCircle);
+      console.log('Curriculum:', curriculum);
+      console.log('Grade:', grade);
 
       let user = await User.findOne({ intraId: profile.id });
 
@@ -126,14 +157,15 @@ class AuthController {
         wallet: profile.wallet,
         correctionPoints: profile.correction_point,
         correction_point: profile.correction_point,
-        
         level: profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
                profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0,
         cursusUsers: profile.cursus_users || [],
-        projectsUsers: projectsUsers,
+        projectsUsers: profile.projects_users || [],
+        questsUsers: questsUsers,
+        currentCircle: currentCircle,
+        curriculum: curriculum,
         achievements: profile.achievements || [],
         coalition: profile.coalitions?.[0],
-        
         accessToken: access_token,
         refreshToken: refresh_token,
         tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
@@ -141,29 +173,22 @@ class AuthController {
       };
 
       if (!user) {
-        console.log('Creating new user with full data...');
+        console.log('Creating new user...');
         user = await User.create(userData);
-        console.log('New user created with', user.projectsUsers?.length || 0, 'projects');
       } else {
-        console.log('Updating existing user with full data...');
+        console.log('Updating existing user...');
         Object.assign(user, userData);
         user.lastLogin = new Date();
         await user.save();
-        console.log('User updated with', user.projectsUsers?.length || 0, 'projects');
       }
 
       const jwtToken = jwt.sign(
-        { 
-          userId: user._id,
-          login: user.login,
-          intraId: user.intraId
-        },
+        { userId: user._id, login: user.login, intraId: user.intraId },
         process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
 
       console.log('JWT created, redirecting to frontend...');
-
       res.redirect(`${process.env.FRONTEND_URL}/auth/success?token=${jwtToken}`);
 
     } catch (error) {
@@ -182,8 +207,6 @@ class AuthController {
 
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       if (user.lastSyncedAt < oneHourAgo) {
-        console.log('Data is stale, fetching fresh data from 42 API...');
-        
         try {
           const fullUser = await User.findById(req.userId);
           if (fullUser.accessToken) {
@@ -191,14 +214,18 @@ class AuthController {
               headers: { 'Authorization': `Bearer ${fullUser.accessToken}` }
             });
             
-          const profile = response.data;
+            const profile = response.data;
+            const questsUsers = await fetchUserQuests(fullUser.accessToken, fullUser.intraId);
+            const currentCircle = calculateCurrentCircle(questsUsers);
+            const curriculum = detectCurriculum(profile.projects_users);
 
-            // Store projects directly - circle mapping is done in frontend
             user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
                          profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
             user.cursusUsers = profile.cursus_users || [];
             user.projectsUsers = profile.projects_users || [];
-            user.achievements = profile.achievements || [];
+            user.questsUsers = questsUsers;
+            user.currentCircle = currentCircle;
+            user.curriculum = curriculum;
             user.wallet = profile.wallet;
             user.correctionPoints = profile.correction_point;
             user.correction_point = profile.correction_point;
@@ -206,8 +233,6 @@ class AuthController {
             user.lastSyncedAt = new Date();
             
             await user.save();
-            
-            console.log('Fresh data fetched and saved');
           }
         } catch (syncError) {
           console.error('Failed to sync data:', syncError.message);
@@ -223,8 +248,6 @@ class AuthController {
 
   async refreshUserData(req, res) {
     try {
-      console.log('Manual refresh requested by user:', req.userId);
-      
       const user = await User.findById(req.userId);
       
       if (!user) {
@@ -235,19 +258,22 @@ class AuthController {
         return res.status(400).json({ error: 'No access token available' });
       }
 
-      console.log('Fetching fresh data from 42 API...');
       const response = await axios.get(`${oauthConfig.apiURL}/me`, {
         headers: { 'Authorization': `Bearer ${user.accessToken}` }
       });
       
       const profile = response.data;
+      const questsUsers = await fetchUserQuests(user.accessToken, user.intraId);
+      const currentCircle = calculateCurrentCircle(questsUsers);
+      const curriculum = detectCurriculum(profile.projects_users);
 
-      // Store projects directly - circle mapping is done in frontend
       user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
                    profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
       user.cursusUsers = profile.cursus_users || [];
       user.projectsUsers = profile.projects_users || [];
-      user.achievements = profile.achievements || [];
+      user.questsUsers = questsUsers;
+      user.currentCircle = currentCircle;
+      user.curriculum = curriculum;
       user.wallet = profile.wallet;
       user.correctionPoints = profile.correction_point;
       user.correction_point = profile.correction_point;
@@ -262,22 +288,11 @@ class AuthController {
       
       await user.save();
       
-      console.log('User data refreshed successfully');
-      console.log('New level:', user.level);
-      console.log('Projects count:', user.projectsUsers?.length || 0);
-      
-      const userResponse = user.toJSON();
-      res.json({ 
-        message: 'Data refreshed successfully',
-        user: userResponse 
-      });
+      res.json({ message: 'Data refreshed successfully', user: user.toJSON() });
       
     } catch (error) {
-      console.error('Refresh user data error:', error.response?.data || error.message);
-      res.status(500).json({ 
-        error: 'Failed to refresh user data',
-        details: error.message 
-      });
+      console.error('Refresh user data error:', error.message);
+      res.status(500).json({ error: 'Failed to refresh user data' });
     }
   }
 
@@ -285,48 +300,57 @@ class AuthController {
     try {
       res.json({ message: 'Logged out successfully' });
     } catch (error) {
-      console.error('Logout error:', error.message);
       res.status(500).json({ error: 'Failed to logout' });
     }
   }
 
   async healthCheck(req, res) {
-    res.json({ 
-      status: 'ok',
-      message: 'Auth system is running',
-      timestamp: new Date().toISOString()
-    });
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   }
 
-  // Get all projects for 42cursus (kept for potential future use)
   async getCursusProjects(req, res) {
     try {
-      // Check cache first
-      if (cursusProjectsCache && cursusProjectsCacheTime && 
-          (Date.now() - cursusProjectsCacheTime < CACHE_DURATION)) {
-        return res.json(cursusProjectsCache);
-      }
-
       const user = await User.findById(req.userId);
-      if (!user || !user.accessToken) {
-        return res.status(400).json({ error: 'No access token available' });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.json({
+        currentCircle: user.currentCircle,
+        curriculum: user.curriculum,
+        questsUsers: user.questsUsers,
+        projectsUsers: user.projectsUsers
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch data' });
+    }
+  }
+
+  async searchUsers(req, res) {
+    try {
+      const { q } = req.query;
+      const currentUser = await User.findById(req.userId);
+      
+      if (!q || q.length < 2) {
+        return res.json([]);
       }
 
-      const projects = await fetchCursusProjects(user.accessToken, 21);
+      const users = await User.find({
+        login: { $regex: q, $options: 'i' },
+        _id: { $ne: currentUser._id }
+      })
+      .select('login displayName avatar image campus level')
+      .limit(10);
 
-      // Cache results
-      cursusProjectsCache = {
-        projects,
-        count: projects.length,
-        fetchedAt: new Date().toISOString()
-      };
-      cursusProjectsCacheTime = Date.now();
-
-      res.json(cursusProjectsCache);
-
+      res.json(users.map(u => ({
+        id: u._id,
+        login: u.login,
+        displayName: u.displayName,
+        avatar: u.image?.versions?.small || u.avatar?.small,
+        campus: u.campus,
+        level: u.level
+      })));
     } catch (error) {
-      console.error('Get cursus projects error:', error.message);
-      res.status(500).json({ error: 'Failed to fetch cursus projects' });
+      res.status(500).json({ error: 'Failed to search users' });
     }
   }
 }

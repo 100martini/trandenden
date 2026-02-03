@@ -11,6 +11,8 @@ PROJECT_NAME := trandenden
 MARIADB_CONTAINER := mariadb
 MONGO_CONTAINER := mongodb
 NETWORK_NAME := transcendence-net
+MONGO_VOLUME := mongodb_data
+MARIADB_VOLUME := mariadb_data
 BACKEND_PORT := 3001
 FRONTEND_PORT := 5173
 
@@ -22,6 +24,7 @@ help:
 	@echo "  $(YELLOW)make stop$(NC)          - Stop all servers"
 	@echo "  $(YELLOW)make restart$(NC)       - Restart everything"
 	@echo "  $(YELLOW)make clean$(NC)         - Clean up Docker containers and network"
+	@echo "  $(YELLOW)make fclean$(NC)        - Clean everything including data volumes"
 	@echo "  $(YELLOW)make logs$(NC)          - Show all logs"
 	@echo ""
 
@@ -45,25 +48,47 @@ _network:
 		docker network create $(NETWORK_NAME) >/dev/null 2>&1
 
 _mongodb: _network
-	@docker rm -f $(MONGO_CONTAINER) 2>/dev/null || true
-	@docker run -d \
-		--name $(MONGO_CONTAINER) \
-		--network $(NETWORK_NAME) \
-		-p 27017:27017 \
-		mongo:latest >/dev/null 2>&1
-	@sleep 2
+	@if [ "$$(docker ps -aq -f name=$(MONGO_CONTAINER))" ]; then \
+		if [ ! "$$(docker ps -q -f name=$(MONGO_CONTAINER))" ]; then \
+			echo "$(MONGO_CONTAINER)"; \
+			docker start $(MONGO_CONTAINER) >/dev/null 2>&1; \
+		else \
+			echo "$(MONGO_CONTAINER)"; \
+		fi \
+	else \
+		echo "$(MONGO_CONTAINER)"; \
+		docker volume create $(MONGO_VOLUME) >/dev/null 2>&1 || true; \
+		docker run -d \
+			--name $(MONGO_CONTAINER) \
+			--network $(NETWORK_NAME) \
+			-p 27017:27017 \
+			-v $(MONGO_VOLUME):/data/db \
+			mongo:latest >/dev/null 2>&1; \
+		sleep 2; \
+	fi
 
 _mariadb: _network
-	@docker rm -f $(MARIADB_CONTAINER) 2>/dev/null || true
-	@docker run -d \
-		--name $(MARIADB_CONTAINER) \
-		--network $(NETWORK_NAME) \
-		-e MYSQL_ROOT_PASSWORD=root \
-		-e MYSQL_DATABASE=trandenden \
-		-e MYSQL_USER=transcendence \
-		-e MYSQL_PASSWORD=transcendence \
-		mariadb:latest >/dev/null 2>&1
-	@sleep 3
+	@if [ "$$(docker ps -aq -f name=$(MARIADB_CONTAINER))" ]; then \
+		if [ ! "$$(docker ps -q -f name=$(MARIADB_CONTAINER))" ]; then \
+			echo "$(MARIADB_CONTAINER)"; \
+			docker start $(MARIADB_CONTAINER) >/dev/null 2>&1; \
+		else \
+			echo "$(MARIADB_CONTAINER)"; \
+		fi \
+	else \
+		echo "$(MARIADB_CONTAINER)"; \
+		docker volume create $(MARIADB_VOLUME) >/dev/null 2>&1 || true; \
+		docker run -d \
+			--name $(MARIADB_CONTAINER) \
+			--network $(NETWORK_NAME) \
+			-e MYSQL_ROOT_PASSWORD=root \
+			-e MYSQL_DATABASE=trandenden \
+			-e MYSQL_USER=transcendence \
+			-e MYSQL_PASSWORD=transcendence \
+			-v $(MARIADB_VOLUME):/var/lib/mysql \
+			mariadb:latest >/dev/null 2>&1; \
+		sleep 3; \
+	fi
 
 start: _mongodb _mariadb
 	@echo ""
@@ -78,10 +103,16 @@ stop:
 	@-docker stop $(MONGO_CONTAINER) $(MARIADB_CONTAINER) 2>/dev/null || true
 
 clean: stop
-	@echo "$(RED)Cleaning up Docker resources$(NC)"
+	@echo "$(RED)Stopping containers$(NC)"
+	@docker stop $(MONGO_CONTAINER) $(MARIADB_CONTAINER) 2>/dev/null || true
+	@echo "$(GREEN)Containers stopped (data preserved)$(NC)"
+
+fclean: stop
+	@echo "$(RED)Cleaning up everything including data$(NC)"
 	@docker rm -f $(MONGO_CONTAINER) $(MARIADB_CONTAINER) 2>/dev/null || true
+	@docker volume rm $(MONGO_VOLUME) $(MARIADB_VOLUME) 2>/dev/null || true
 	@docker network rm $(NETWORK_NAME) 2>/dev/null || true
-	@echo "$(GREEN)Cleanup complete$(NC)"
+	@echo "$(GREEN)Full cleanup complete$(NC)"
 
 restart: stop start
 

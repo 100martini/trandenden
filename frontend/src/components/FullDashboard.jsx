@@ -1,257 +1,339 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { removeToken } from '../utils/auth';
+import { removeToken, getToken } from '../utils/auth';
 import '../styles/FullDashboard.css';
 
-// BNG Common Core circle mapping
-// 42 API has NO circle data - only difficulty (XP) which doesn't map to circles
-// This is specific to Benguerir campus common core structure
-const BNG_CIRCLE_MAP = {
-  // Circle 0
-  'libft': 0, '42cursus-libft': 0,
-  
-  // Circle 1  
-  'ft_printf': 1, '42cursus-ft_printf': 1,
-  'get_next_line': 1, '42cursus-get_next_line': 1,
-  'born2beroot': 1, '42cursus-born2beroot': 1,
-  
-  // Circle 2
-  'push_swap': 2, '42cursus-push_swap': 2,
-  'minitalk': 2, '42cursus-minitalk': 2,
-  'pipex': 2, '42cursus-pipex': 2,
-  'so_long': 2, '42cursus-so_long': 2,
-  'fdf': 2, '42cursus-fdf': 2,
-  'fract-ol': 2, '42cursus-fract-ol': 2,
-  
-  // Circle 3
-  'philosophers': 3, '42cursus-philosophers': 3,
-  'minishell': 3, '42cursus-minishell': 3,
-  
-  // Circle 4
-  'cub3d': 4, '42cursus-cub3d': 4,
-  'minirt': 4, '42cursus-minirt': 4,
-  'netpractice': 4, '42cursus-netpractice': 4,
-  'cpp-module-00': 4, '42cursus-cpp-module-00': 4,
-  'cpp-module-01': 4, '42cursus-cpp-module-01': 4,
-  'cpp-module-02': 4, '42cursus-cpp-module-02': 4,
-  'cpp-module-03': 4, '42cursus-cpp-module-03': 4,
-  'cpp-module-04': 4, '42cursus-cpp-module-04': 4,
-  
-  // Circle 5
-  'cpp-module-05': 5, '42cursus-cpp-module-05': 5,
-  'cpp-module-06': 5, '42cursus-cpp-module-06': 5,
-  'cpp-module-07': 5, '42cursus-cpp-module-07': 5,
-  'cpp-module-08': 5, '42cursus-cpp-module-08': 5,
-  'cpp-module-09': 5, '42cursus-cpp-module-09': 5,
-  'webserv': 5, '42cursus-webserv': 5,
-  'ft_irc': 5, '42cursus-ft_irc': 5,
-  'inception': 5, '42cursus-inception': 5,
-  
-  // Circle 6
-  'ft_transcendence': 6, '42cursus-ft_transcendence': 6,
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+const OLD_CURRICULUM = {
+  0: [{ slug: 'libft', name: 'Libft', team: 1 }],
+  1: [
+    { slug: 'get_next_line', name: 'get_next_line', team: 1 },
+    { slug: 'ft_printf', name: 'ft_printf', team: 1 },
+    { slug: 'born2beroot', name: 'Born2beroot', team: 1 }
+  ],
+  2: [
+    { slug: 'push_swap', name: 'push_swap', team: 1 },
+    { slug: 'pipex', name: 'pipex', team: 1, alt: 'minitalk' },
+    { slug: 'minitalk', name: 'minitalk', team: 1, alt: 'pipex' },
+    { slug: 'fract-ol', name: 'fract-ol', team: 1, alt: 'fdf' },
+    { slug: 'fdf', name: 'FdF', team: 1, alt: 'fract-ol' },
+    { slug: 'so_long', name: 'so_long', team: 1, alt: 'fract-ol' }
+  ],
+  3: [
+    { slug: 'philosophers', name: 'Philosophers', team: 1 },
+    { slug: 'minishell', name: 'minishell', team: 2 }
+  ],
+  4: [
+    { slug: 'cub3d', name: 'cub3D', team: 2, alt: 'minirt' },
+    { slug: 'minirt', name: 'miniRT', team: 2, alt: 'cub3d' },
+    { slug: 'netpractice', name: 'NetPractice', team: 1 },
+    { slug: 'cpp-module-00', name: 'CPP Module 00', team: 1 },
+    { slug: 'cpp-module-01', name: 'CPP Module 01', team: 1 },
+    { slug: 'cpp-module-02', name: 'CPP Module 02', team: 1 },
+    { slug: 'cpp-module-03', name: 'CPP Module 03', team: 1 },
+    { slug: 'cpp-module-04', name: 'CPP Module 04', team: 1 }
+  ],
+  5: [
+    { slug: 'webserv', name: 'webserv', team: 3 },
+    { slug: 'ft_irc', name: 'ft_irc', team: 3, alt: 'webserv' },
+    { slug: 'cpp-module-05', name: 'CPP Module 05', team: 1 },
+    { slug: 'cpp-module-06', name: 'CPP Module 06', team: 1 },
+    { slug: 'cpp-module-07', name: 'CPP Module 07', team: 1 },
+    { slug: 'cpp-module-08', name: 'CPP Module 08', team: 1 },
+    { slug: 'cpp-module-09', name: 'CPP Module 09', team: 1 },
+    { slug: 'inception', name: 'Inception', team: 1 }
+  ],
+  6: [
+    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 5 },
+    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2 }
+  ]
+};
+
+const NEW_CURRICULUM = {
+  0: [{ slug: 'libft', name: 'Libft', team: 1 }],
+  1: [
+    { slug: 'get_next_line', name: 'get_next_line', team: 1 },
+    { slug: 'ft_printf', name: 'ft_printf', team: 1 },
+    { slug: 'push_swap', name: 'push_swap', team: 1 }
+  ],
+  2: [
+    { slug: 'born2beroot', name: 'Born2beroot', team: 1 },
+    { slug: 'python-module-00', name: 'Python Module 00', team: 1 },
+    { slug: 'python-module-01', name: 'Python Module 01', team: 1 },
+    { slug: 'python-module-02', name: 'Python Module 02', team: 1 },
+    { slug: 'python-module-03', name: 'Python Module 03', team: 1 },
+    { slug: 'python-module-04', name: 'Python Module 04', team: 1 },
+    { slug: 'python-module-05', name: 'Python Module 05', team: 1 },
+    { slug: 'python-module-06', name: 'Python Module 06', team: 1 },
+    { slug: 'python-module-07', name: 'Python Module 07', team: 1 },
+    { slug: 'python-module-08', name: 'Python Module 08', team: 1 },
+    { slug: 'python-module-09', name: 'Python Module 09', team: 1 },
+    { slug: 'python-module-10', name: 'Python Module 10', team: 1 },
+    { slug: 'a-maze-ing', name: 'A-Maze-ing', team: 2 }
+  ],
+  3: [
+    { slug: 'codexion', name: 'Codexion', team: 1 },
+    { slug: 'fly-in', name: 'Fly-in', team: 1 },
+    { slug: 'call-me-maybe', name: 'Call Me Maybe', team: 1 }
+  ],
+  4: [
+    { slug: 'netpractice', name: 'NetPractice', team: 1 },
+    { slug: 'pac-man', name: 'Pac-Man', team: 2 },
+    { slug: 'rag-against-the-machine', name: 'RAG against the machine', team: 1 }
+  ],
+  5: [
+    { slug: 'agent-smith', name: 'Agent Smith', team: 3 },
+    { slug: 'the-answer-protocol', name: 'The Answer Protocol', team: 3 },
+    { slug: 'inception', name: 'Inception', team: 1 }
+  ],
+  6: [
+    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 5 },
+    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2 }
+  ]
+};
+
+const COMMON_CIRCLE_01 = {
+  0: [{ slug: 'libft', name: 'Libft', team: 1 }],
+  1: [
+    { slug: 'get_next_line', name: 'get_next_line', team: 1 },
+    { slug: 'ft_printf', name: 'ft_printf', team: 1 }
+  ]
 };
 
 const FullDashboard = ({ user }) => {
   const navigate = useNavigate();
   const [selectedCircle, setSelectedCircle] = useState(null);
-  const [showOuterCore, setShowOuterCore] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [activeSection, setActiveSection] = useState('cc');
+  const [teamName, setTeamName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   const handleLogout = useCallback(() => {
     removeToken();
     navigate('/login');
   }, [navigate]);
 
-  // User data with defaults
-  const displayName = user?.displayName || user?.firstName || 'User';
-  const username = user?.login || 'yourlogin';
+  const searchUsers = useCallback(async (query) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/auth/users/search?q=${encodeURIComponent(query)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setSearchResults(data);
+    } catch (err) {
+      setSearchResults([]);
+    }
+    setSearching(false);
+  }, []);
+
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    searchUsers(query);
+  };
+
+  const addMember = (member) => {
+    const maxMembers = (selectedProject?.team || 2) - 1;
+    if (selectedMembers.length >= maxMembers) {
+      return;
+    }
+    if (!selectedMembers.find(m => m.id === member.id)) {
+      setSelectedMembers([...selectedMembers, member]);
+    }
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const removeMember = (memberId) => {
+    setSelectedMembers(selectedMembers.filter(m => m.id !== memberId));
+  };
+
+  const resetTeamModal = () => {
+    setTeamName('');
+    setSearchQuery('');
+    setSearchResults([]);
+    setSelectedMembers([]);
+  };
+
+  const canCreateTeam = teamName.trim() !== '' && selectedMembers.length > 0;
+
+  const username = user?.login || 'user';
   const campus = user?.campus || 'Campus';
   const wallet = user?.wallet || 0;
   const correctionPoints = user?.correctionPoints || user?.correction_point || 0;
-  
-  const level = user?.level || 
-                user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level ||
-                user?.cursusUsers?.[user?.cursusUsers.length - 1]?.level || 0;
-                
-  const avatarUrl = user?.image?.link || user?.image?.versions?.medium || user?.avatar?.medium || user?.avatar;
+  const level = user?.level || user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level || 0;
+  const avatarUrl = user?.image?.link || user?.image?.versions?.medium || user?.avatar?.medium;
   const allProjects = user?.projectsUsers || [];
+  const currentCircle = user?.currentCircle ?? 0;
+  const curriculum = user?.curriculum || 'unknown';
 
-  // Filter out exams and piscine projects
-  const isExamOrPiscine = useCallback((projectName, projectSlug) => {
-    const name = (projectName || '').toLowerCase();
-    const slug = (projectSlug || '').toLowerCase();
-    return name.includes('exam') || slug.includes('exam') || 
-           name.includes('piscine') || slug.includes('piscine') || 
-           name.includes('rush') || slug.includes('rush');
-  }, []);
+  const grade = useMemo(() => {
+    const cursus42 = user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus' || c.cursus_id === 21);
+    return cursus42?.grade || 'Cadet';
+  }, [user]);
 
-  // Get circle for a project using BNG mapping
-  const getProjectCircle = useCallback((project) => {
-    if (!project) return null;
-    
-    const slug = (project.slug || '').toLowerCase();
-    const name = (project.name || '').toLowerCase().replace(/ /g, '_');
-    
-    // Try exact slug match
-    if (BNG_CIRCLE_MAP[slug] !== undefined) return BNG_CIRCLE_MAP[slug];
-    
-    // Try name match
-    if (BNG_CIRCLE_MAP[name] !== undefined) return BNG_CIRCLE_MAP[name];
-    
-    // Try partial matches for common patterns
-    for (const [key, circle] of Object.entries(BNG_CIRCLE_MAP)) {
-      if (slug.includes(key) || key.includes(slug)) {
-        return circle;
-      }
-    }
-    
-    // Not in common core - it's outer core
-    return 'outer';
-  }, []);
+  const isCadet = grade === 'Cadet';
+  const isTranscender = grade === 'Transcender' || grade === 'Member';
 
-  // Process projects into circles
-  const { currentCircle, circleProjects, availableCircles, outerCoreProjects } = useMemo(() => {
-    const projectsByCircle = {};
-    const outerCore = [];
+  const getCurriculum = useMemo(() => {
+    if (curriculum === 'old') return OLD_CURRICULUM;
+    if (curriculum === 'new') return NEW_CURRICULUM;
+    return COMMON_CIRCLE_01;
+  }, [curriculum]);
 
-    allProjects.forEach(p => {
-      // Skip exams and piscines
-      if (isExamOrPiscine(p.project?.name, p.project?.slug)) return;
-      
-      // Only include 42cursus projects (cursus_id 21)
-      if (p.cursus_ids && !p.cursus_ids.includes(21)) return;
-      
-      const circle = getProjectCircle(p.project);
-      
-      if (circle === 'outer') {
-        outerCore.push(p);
-        return;
-      }
-      
-      if (circle === null) return;
-      
-      if (!projectsByCircle[circle]) {
-        projectsByCircle[circle] = [];
-      }
-      projectsByCircle[circle].push(p);
+  const getUserProjectStatus = useCallback((projectSlug) => {
+    const normalizedSlug = projectSlug.toLowerCase().replace(/_/g, '-');
+    const project = allProjects.find(p => {
+      const pSlug = (p.project?.slug || '').toLowerCase().replace(/_/g, '-');
+      return pSlug.includes(normalizedSlug) || normalizedSlug.includes(pSlug);
     });
-
-    // Determine current circle
-    let currentCircleValue = 0;
-    let hasInProgress = false;
-    
-    // Check for in-progress projects
-    for (const [circle, projects] of Object.entries(projectsByCircle)) {
-      const inProgress = projects.some(p => 
-        p.status === 'in_progress' || p.status === 'searching_a_group'
-      );
-      if (inProgress) {
-        currentCircleValue = Math.max(currentCircleValue, Number(circle));
-        hasInProgress = true;
-      }
-    }
-    
-    // If no in-progress, find highest completed circle + 1
-    if (!hasInProgress) {
-      const circles = Object.keys(projectsByCircle).map(Number).sort((a, b) => b - a);
-      if (circles.length > 0) {
-        const highestWithProjects = circles[0];
-        const highestProjects = projectsByCircle[highestWithProjects] || [];
-        const allValidated = highestProjects.length > 0 && 
-          highestProjects.every(p => p.status === 'finished' && p['validated?']);
-        
-        if (allValidated && highestWithProjects < 6) {
-          currentCircleValue = highestWithProjects + 1;
-        } else {
-          currentCircleValue = highestWithProjects;
-        }
-      }
-    }
-
-    const available = Object.keys(projectsByCircle)
-      .map(Number)
-      .sort((a, b) => a - b);
-    
-    // Add current circle if not in list
-    if (!available.includes(currentCircleValue) && currentCircleValue <= 6) {
-      available.push(currentCircleValue);
-      available.sort((a, b) => a - b);
-      projectsByCircle[currentCircleValue] = [];
-    }
-
+    if (!project) return null;
     return {
-      currentCircle: currentCircleValue,
-      circleProjects: projectsByCircle,
-      availableCircles: available,
-      outerCoreProjects: outerCore
+      status: project.status,
+      validated: project['validated?'],
+      finalMark: project.final_mark,
+      id: project.id
     };
-  }, [allProjects, isExamOrPiscine, getProjectCircle]);
+  }, [allProjects]);
 
-  // Active circle selection
+  const getCircleProjects = useCallback((circleNum) => {
+    const circleDefinition = getCurriculum[circleNum] || [];
+    return circleDefinition.map(proj => ({
+      ...proj,
+      userStatus: getUserProjectStatus(proj.slug)
+    }));
+  }, [getCurriculum, getUserProjectStatus]);
+
+  const needsCurriculumDetection = curriculum === 'unknown' && currentCircle >= 1;
+
   const activeCircle = selectedCircle !== null ? selectedCircle : currentCircle;
-  const displayProjects = showOuterCore ? outerCoreProjects : (circleProjects[activeCircle] || []);
 
-  // Stats
-  const getCircleStats = useCallback((circle) => {
-    const projects = circleProjects[circle] || [];
-    return {
-      total: projects.length,
-      completed: projects.filter(p => p.status === 'finished' && p['validated?']).length,
-      inProgress: projects.filter(p => p.status === 'in_progress' || p.status === 'searching_a_group').length,
-    };
-  }, [circleProjects]);
+  const circleProjects = useMemo(() => {
+    if (needsCurriculumDetection && activeCircle === 1) {
+      return getCircleProjects(1);
+    }
+    return getCircleProjects(activeCircle);
+  }, [activeCircle, getCircleProjects, needsCurriculumDetection]);
+
+  const getCircleStats = useCallback((circleNum) => {
+    const projects = getCircleProjects(circleNum);
+    const completed = projects.filter(p => p.userStatus?.status === 'finished' && p.userStatus?.validated).length;
+    return { total: projects.length, completed };
+  }, [getCircleProjects]);
+
+  const allCCProjects = useMemo(() => {
+    if (!isTranscender) return [];
+    const projects = [];
+    const curr = curriculum === 'new' ? NEW_CURRICULUM : OLD_CURRICULUM;
+    for (let i = 0; i <= 6; i++) {
+      const circleProjs = curr[i] || [];
+      circleProjs.forEach(proj => {
+        const userStatus = getUserProjectStatus(proj.slug);
+        if (userStatus) {
+          projects.push({ ...proj, circle: i, userStatus });
+        }
+      });
+    }
+    return projects;
+  }, [isTranscender, curriculum, getUserProjectStatus]);
+
+  const outerCoreProjects = useMemo(() => {
+    if (!isTranscender) return [];
+    const ccSlugs = new Set();
+    const curr = curriculum === 'new' ? NEW_CURRICULUM : OLD_CURRICULUM;
+    for (let i = 0; i <= 6; i++) {
+      (curr[i] || []).forEach(p => ccSlugs.add(p.slug.toLowerCase()));
+    }
+    return allProjects.filter(p => {
+      const slug = (p.project?.slug || '').toLowerCase();
+      const isCC = Array.from(ccSlugs).some(cc => slug.includes(cc) || cc.includes(slug));
+      const is42Cursus = p.cursus_ids?.includes(21);
+      return is42Cursus && !isCC;
+    }).map(p => ({
+      slug: p.project?.slug,
+      name: p.project?.name,
+      team: 1,
+      userStatus: {
+        status: p.status,
+        validated: p['validated?'],
+        finalMark: p.final_mark,
+        id: p.id
+      }
+    }));
+  }, [isTranscender, curriculum, allProjects]);
+
+  const handleProjectClick = (project) => {
+    if (project.team > 1) {
+      setSelectedProject(project);
+      setShowCreateTeam(true);
+    } else {
+      navigate(`/kanban/${project.slug}`);
+    }
+  };
+
+  const handleTeamCreated = () => {
+    setShowCreateTeam(false);
+    resetTeamModal();
+    if (selectedProject) {
+      navigate(`/kanban/${selectedProject.slug}`);
+    }
+  };
+
+  const closeModal = () => {
+    setSelectedProject(null);
+    setShowCreateTeam(false);
+    resetTeamModal();
+  };
+
+  const getStatusBadge = (userStatus) => {
+    if (!userStatus) return { className: 'badge-not-started', text: 'Not Started' };
+    if (userStatus.status === 'finished' && userStatus.validated) {
+      return { className: 'badge-completed', text: `${userStatus.finalMark}%` };
+    }
+    if (userStatus.status === 'finished' && !userStatus.validated) {
+      return { className: 'badge-failed', text: 'Failed' };
+    }
+    if (userStatus.status === 'in_progress') {
+      return { className: 'badge-active', text: 'In Progress' };
+    }
+    if (userStatus.status === 'searching_a_group') {
+      return { className: 'badge-searching', text: 'Finding Team' };
+    }
+    return { className: 'badge-active', text: userStatus.status };
+  };
 
   const getInitials = (name) => {
-    if (!name) return 'YO';
+    if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const totalActive = allProjects.filter(p => 
+    p.status === 'in_progress' || p.status === 'searching_a_group'
+  ).length;
+  
+  const totalCompleted = allProjects.filter(p => 
+    p.status === 'finished' && p['validated?']
+  ).length;
+
   const titles = [
     "the Legendary", "the Mighty", "the Architect", "the Unstoppable",
-    "the Bug Slayer", "the Chosen One", "the Code Wizard",
+    "the Bug Slayer", "the Chosen One", "the Code Wizard"
   ];
 
   const randomTitle = useMemo(() => 
     titles[Math.floor(Math.random() * titles.length)], 
   []);
-
-  const getStatusBadge = (project) => {
-    if (project.status === 'finished' && project['validated?']) {
-      return { class: 'badge-completed', text: `${project.final_mark || 0}%` };
-    }
-    if (project.status === 'finished' && !project['validated?']) {
-      return { class: 'badge-failed', text: 'Failed' };
-    }
-    if (project.status === 'in_progress') {
-      return { class: 'badge-active', text: 'In Progress' };
-    }
-    if (project.status === 'searching_a_group') {
-      return { class: 'badge-searching', text: 'Looking for team' };
-    }
-    return { class: 'badge-active', text: project.status };
-  };
-
-  // Overall stats
-  const totalActive = Object.values(circleProjects).flat().filter(p => 
-    p.status === 'in_progress' || p.status === 'searching_a_group'
-  ).length;
-  
-  const totalCompleted = Object.values(circleProjects).flat().filter(p => 
-    p.status === 'finished' && p['validated?']
-  ).length;
-
-  const activeStats = showOuterCore 
-    ? { total: outerCoreProjects.length, completed: outerCoreProjects.filter(p => p.status === 'finished' && p['validated?']).length }
-    : getCircleStats(activeCircle);
-
-  const handleCircleClick = (circle) => {
-    setShowOuterCore(false);
-    setSelectedCircle(circle);
-  };
-
-  const handleOuterCoreClick = () => {
-    setShowOuterCore(true);
-    setSelectedCircle(null);
-  };
 
   return (
     <div className="full-dashboard">
@@ -279,12 +361,12 @@ const FullDashboard = ({ user }) => {
           {avatarUrl ? (
             <img src={avatarUrl} alt={username} className="user-avatar-img" />
           ) : (
-            <div className="user-avatar">{getInitials(displayName)}</div>
+            <div className="user-avatar">{getInitials(username)}</div>
           )}
           <div className="user-info">
             <div className="user-login">@{username}</div>
           </div>
-          <button onClick={handleLogout} className="logout-dots">•••</button>
+          <button onClick={handleLogout} className="logout-dots">...</button>
         </div>
       </aside>
 
@@ -294,16 +376,17 @@ const FullDashboard = ({ user }) => {
             <h1>{username}, {randomTitle}</h1>
             <p>Here's what's happening with your projects</p>
           </div>
-          <button className="btn-new-project">
-            <span className="plus-icon">+</span>
-            New Project
-          </button>
+          <div className="header-actions">
+            <span className="curriculum-badge">
+              {curriculum === 'old' ? 'C/C++' : curriculum === 'new' ? 'Python' : 'Detecting...'}
+            </span>
+          </div>
         </div>
 
         <div className="stats">
           <div className="stat-card">
             <div className="stat-value">{totalActive}</div>
-            <div className="stat-label">Active Projects</div>
+            <div className="stat-label">Active</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{totalCompleted}</div>
@@ -315,14 +398,11 @@ const FullDashboard = ({ user }) => {
           </div>
           <div className="stat-card">
             <div className="stat-value">{correctionPoints}</div>
-            <div className="stat-label">Evaluation Points</div>
+            <div className="stat-label">Eval Points</div>
           </div>
         </div>
 
         <div className="info-card">
-          <div className="info-header">
-            <h3>Your Profile</h3>
-          </div>
           <div className="info-grid">
             <div className="info-item">
               <div className="info-label">Level</div>
@@ -333,141 +413,267 @@ const FullDashboard = ({ user }) => {
               <div className="info-value">{campus}</div>
             </div>
             <div className="info-item">
-              <div className="info-label">Email</div>
-              <div className="info-value">{user?.email}</div>
+              <div className="info-label">Grade</div>
+              <div className="info-value">{grade}</div>
             </div>
             <div className="info-item">
-              <div className="info-label">Current Circle</div>
-              <div className="info-value">Circle {currentCircle}</div>
+              <div className="info-label">Circle</div>
+              <div className="info-value">{currentCircle}</div>
             </div>
           </div>
         </div>
 
-        {/* Circle Selector */}
-        <div className="section-header">
-          <h2>Circle Projects</h2>
-        </div>
+        {isCadet && (
+          <>
+            <div className="section-header">
+              <h2>Circles</h2>
+            </div>
 
-        <div className="circle-selector">
-          {availableCircles.map(circle => {
-            const stats = getCircleStats(circle);
-            const isComplete = stats.completed === stats.total && stats.total > 0;
-            const isActive = !showOuterCore && activeCircle === circle;
-            
-            return (
-              <button
-                key={circle}
-                className={`circle-btn ${isActive ? 'active' : ''} ${isComplete ? 'complete' : ''} ${circle === currentCircle ? 'current' : ''}`}
-                onClick={() => handleCircleClick(circle)}
-              >
-                <span className="circle-number">{circle}</span>
-                <span className="circle-progress">
-                  {stats.completed}/{stats.total}
-                </span>
-              </button>
-            );
-          })}
-          
-          {/* Outer Core Button */}
-          {outerCoreProjects.length > 0 && (
-            <button
-              className={`circle-btn outer-core-btn ${showOuterCore ? 'active' : ''}`}
-              onClick={handleOuterCoreClick}
-            >
-              <span className="circle-number">∞</span>
-              <span className="circle-progress">
-                {outerCoreProjects.filter(p => p.status === 'finished' && p['validated?']).length}/{outerCoreProjects.length}
-              </span>
-            </button>
-          )}
-        </div>
+            <div className="circle-selector">
+              {[0, 1, 2, 3, 4, 5, 6].map(circle => {
+                const stats = getCircleStats(circle);
+                const isLocked = curriculum === 'unknown' && circle > 1;
+                const isCurrent = circle === currentCircle;
+                const isCompleted = circle < currentCircle;
+                const isActive = circle === activeCircle;
+                
+                return (
+                  <button
+                    key={circle}
+                    className={`circle-btn ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''} ${isCompleted ? 'complete' : ''} ${isLocked ? 'locked' : ''}`}
+                    onClick={() => !isLocked && setSelectedCircle(circle)}
+                    disabled={isLocked}
+                  >
+                    <span className="circle-number">{circle}</span>
+                    {!isLocked && (
+                      <span className="circle-progress">{stats.completed}/{stats.total}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-        {/* Projects Grid */}
-        <div className="section-header" style={{ marginTop: '24px' }}>
-          <h2>{showOuterCore ? 'Outer Core' : `Circle ${activeCircle}`}</h2>
-          <span style={{ color: 'var(--light)', fontSize: '14px' }}>
-            {activeStats.completed}/{activeStats.total} completed
-          </span>
-        </div>
+            {needsCurriculumDetection && activeCircle === 1 && (
+              <div className="curriculum-notice">
+                <p>Register for <strong>Born2beroot</strong> or <strong>push_swap</strong> on the intranet to unlock your curriculum path.</p>
+              </div>
+            )}
 
-        {displayProjects.length > 0 ? (
-          <div className="projects-grid">
-            {displayProjects.map((project, index) => {
-              const badge = getStatusBadge(project);
-              return (
-                <div key={project.id || index} className="project-card">
-                  <div className="project-header">
-                    <div className="project-icon">
-                      {(project.project?.name || 'P').substring(0, 2).toUpperCase()}
+            <div className="section-header">
+              <h2>Circle {activeCircle} Projects</h2>
+            </div>
+
+            <div className="projects-grid">
+              {circleProjects.map((project, idx) => {
+                const badge = getStatusBadge(project.userStatus);
+                return (
+                  <div 
+                    key={idx} 
+                    className="project-card"
+                    onClick={() => handleProjectClick(project)}
+                  >
+                    <div className="project-header">
+                      <div className="project-icon">
+                        {project.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <span className={`project-badge ${badge.className}`}>
+                        {badge.text}
+                      </span>
                     </div>
-                    <span className={`project-badge ${badge.class}`}>
-                      {badge.text}
-                    </span>
+                    <div className="project-name">{project.name}</div>
+                    <div className="project-meta">
+                      {project.team > 1 ? `Team (${project.team})` : 'Solo'}
+                    </div>
                   </div>
-                  <div className="project-name">{project.project?.name || 'Unknown Project'}</div>
-                  <div className="project-status">
-                    {project.status === 'finished' 
-                      ? (project['validated?'] ? 'Validated' : 'Not validated')
-                      : project.status?.replace(/_/g, ' ')
-                    }
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {isTranscender && (
+          <>
+            <div className="section-header">
+              <h2>Core Selection</h2>
+            </div>
+
+            <div className="core-selector">
+              <button 
+                className={`core-btn ${activeSection === 'cc' ? 'active' : ''}`}
+                onClick={() => setActiveSection('cc')}
+              >
+                <span className="core-label">CC</span>
+                <span className="core-sublabel">Common Core</span>
+              </button>
+              <button 
+                className={`core-btn ${activeSection === 'oc' ? 'active' : ''}`}
+                onClick={() => setActiveSection('oc')}
+              >
+                <span className="core-label">OC</span>
+                <span className="core-sublabel">Outer Core</span>
+              </button>
+            </div>
+
+            {activeSection === 'cc' && (
+              <>
+                <div className="section-header">
+                  <h2>Common Core - Completed</h2>
+                </div>
+                <div className="projects-grid">
+                  {allCCProjects.map((project, idx) => {
+                    const badge = getStatusBadge(project.userStatus);
+                    return (
+                      <div 
+                        key={idx} 
+                        className="project-card"
+                        onClick={() => handleProjectClick(project)}
+                      >
+                        <div className="project-header">
+                          <div className="project-icon">
+                            {project.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <span className={`project-badge ${badge.className}`}>
+                            {badge.text}
+                          </span>
+                        </div>
+                        <div className="project-name">{project.name}</div>
+                        <div className="project-meta">Circle {project.circle}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {activeSection === 'oc' && (
+              <>
+                <div className="section-header">
+                  <h2>Outer Core Projects</h2>
+                </div>
+                {outerCoreProjects.length > 0 ? (
+                  <div className="projects-grid">
+                    {outerCoreProjects.map((project, idx) => {
+                      const badge = getStatusBadge(project.userStatus);
+                      return (
+                        <div 
+                          key={idx} 
+                          className="project-card"
+                          onClick={() => handleProjectClick(project)}
+                        >
+                          <div className="project-header">
+                            <div className="project-icon">
+                              {project.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span className={`project-badge ${badge.className}`}>
+                              {badge.text}
+                            </span>
+                          </div>
+                          <div className="project-name">{project.name}</div>
+                          <div className="project-meta">Outer Core</div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {project.status === 'finished' && project.final_mark !== null && (
-                    <div className="project-grade">
-                      Final Grade: <strong>{project.final_mark}%</strong>
+                ) : (
+                  <div className="empty-state">
+                    <h3>No Outer Core Projects</h3>
+                    <p>Register for projects on the intranet to start your outer core journey.</p>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </main>
+
+      {showCreateTeam && selectedProject && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Create Team</h2>
+              <button className="modal-close" onClick={closeModal}>x</button>
+            </div>
+            <div className="modal-body">
+              <p><strong>{selectedProject.name}</strong></p>
+              <p>Team size: {selectedProject.team} members (you + {selectedProject.team - 1} others)</p>
+              
+              <div className="team-form">
+                <input 
+                  type="text" 
+                  placeholder="Team name *" 
+                  className={`team-input ${!teamName.trim() ? 'input-required' : ''}`}
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                />
+                
+                <div className="search-container">
+                  <input 
+                    type="text" 
+                    placeholder="Search member by login..." 
+                    className="team-input"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    disabled={selectedMembers.length >= selectedProject.team - 1}
+                  />
+                  {searching && <div className="search-loading">Searching...</div>}
+                  {selectedMembers.length >= selectedProject.team - 1 && (
+                    <div className="max-members-reached">Maximum team members reached</div>
+                  )}
+                  {searchResults.length > 0 && (
+                    <div className="search-results">
+                      {searchResults.map(result => (
+                        <div 
+                          key={result.id} 
+                          className="search-result-item"
+                          onClick={() => addMember(result)}
+                        >
+                          {result.avatar ? (
+                            <img src={result.avatar} alt={result.login} className="result-avatar" />
+                          ) : (
+                            <div className="result-avatar-placeholder">{result.login.slice(0, 2).toUpperCase()}</div>
+                          )}
+                          <div className="result-info">
+                            <span className="result-login">{result.login}</span>
+                            <span className="result-details">{result.campus} - Level {result.level?.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty-state">
-            {showOuterCore ? (
-              <>
-                <h3>No Outer Core Projects</h3>
-                <p>Register for outer core projects on the intranet to see them here.</p>
-              </>
-            ) : activeCircle === 6 ? (
-              <>
-                <h3>You made it to Circle 6!</h3>
-                <p>Register for ft_transcendence on the intranet to begin your final project.</p>
-              </>
-            ) : (
-              <>
-                <h3>No Projects in Circle {activeCircle}</h3>
-                <p>You haven't started any projects in this circle yet.</p>
-              </>
-            )}
-          </div>
-        )}
 
-        {/* Teams Section */}
-        <div className="section-header" style={{ marginTop: '32px' }}>
-          <h2>My Teams</h2>
-          <a href="#" style={{ color: 'var(--light)', fontSize: '14px', textDecoration: 'none' }}>
-            View all
-          </a>
+                <div className="selected-members">
+                  <p>Team Members: {selectedMembers.length}/{selectedProject.team - 1}</p>
+                  {selectedMembers.length === 0 && (
+                    <div className="no-members">Add at least one member to continue</div>
+                  )}
+                  {selectedMembers.map(member => (
+                    <div key={member.id} className="selected-member">
+                      {member.avatar ? (
+                        <img src={member.avatar} alt={member.login} className="member-avatar" />
+                      ) : (
+                        <div className="member-avatar-placeholder">{member.login.slice(0, 2).toUpperCase()}</div>
+                      )}
+                      <span>{member.login}</span>
+                      <button className="remove-member" onClick={() => removeMember(member.id)}>x</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={closeModal}>Cancel</button>
+              <button 
+                className={`btn-primary ${!canCreateTeam ? 'btn-disabled' : ''}`} 
+                onClick={handleTeamCreated}
+                disabled={!canCreateTeam}
+              >
+                Create Team
+              </button>
+            </div>
+          </div>
         </div>
-
-        <div className="empty-state">
-          <h3>No Teams Yet</h3>
-          <p>Create your first team to start collaborating on projects</p>
-          <button className="btn-create-team" style={{
-            marginTop: '16px',
-            padding: '12px 24px',
-            background: 'var(--cream)',
-            color: 'var(--dark)',
-            border: 'none',
-            borderRadius: '12px',
-            fontFamily: 'Space Grotesk, sans-serif',
-            fontWeight: '600',
-            fontSize: '14px',
-            cursor: 'pointer'
-          }}>
-            + Create Team
-          </button>
-        </div>
-      </main>
+      )}
     </div>
   );
 };

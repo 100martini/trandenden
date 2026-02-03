@@ -56,6 +56,27 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed
   }],
   
+  questsUsers: [{
+    type: mongoose.Schema.Types.Mixed
+  }],
+  
+  currentCircle: {
+    type: Number,
+    default: 0
+  },
+  
+  curriculum: {
+    type: String,
+    enum: ['unknown', 'old', 'new'],
+    default: 'unknown'
+  },
+  
+  curriculum: {
+    type: String,
+    enum: ['unknown', 'old', 'new'],
+    default: 'unknown'
+  },
+  
   achievements: [{
     type: mongoose.Schema.Types.Mixed
   }],
