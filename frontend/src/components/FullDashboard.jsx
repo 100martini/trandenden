@@ -115,10 +115,14 @@ const FullDashboard = ({ user }) => {
   const [myTeams, setMyTeams] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
   const [showInvites, setShowInvites] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState(null);
+  const [deleteRequests, setDeleteRequests] = useState([]);
 
   useEffect(() => {
     fetchMyTeams();
     fetchPendingInvites();
+    fetchDeleteRequests();
   }, []);
 
   const fetchMyTeams = async () => {
@@ -148,6 +152,21 @@ const FullDashboard = ({ user }) => {
       }
     } catch (err) {
       console.error('Failed to fetch invites');
+    }
+  };
+
+  const fetchDeleteRequests = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/teams/delete-requests`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDeleteRequests(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch delete requests');
     }
   };
 
@@ -355,9 +374,16 @@ const FullDashboard = ({ user }) => {
     }
   };
 
-  const handleInviteResponse = async (teamId, accept) => {
+  const handleInviteResponse = async (team, accept) => {
     try {
       const token = getToken();
+      const teamId = team._id || team.id;
+      
+      if (!teamId) {
+        console.error('No team ID found:', team);
+        return;
+      }
+      
       const response = await fetch(`${API_URL}/teams/${teamId}/respond`, {
         method: 'PATCH',
         headers: {
@@ -373,6 +399,61 @@ const FullDashboard = ({ user }) => {
       }
     } catch (err) {
       console.error('Failed to respond to invite');
+    }
+  };
+
+  const handleDeleteTeam = (team, e) => {
+    e.stopPropagation();
+    setTeamToDelete(team);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteTeam = async () => {
+    if (!teamToDelete) return;
+    
+    try {
+      const token = getToken();
+      const teamId = teamToDelete._id || teamToDelete.id;
+      
+      const response = await fetch(`${API_URL}/teams/${teamId}/request-delete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        await fetchMyTeams();
+        await fetchDeleteRequests();
+        setShowDeleteConfirm(false);
+        setTeamToDelete(null);
+      }
+    } catch (err) {
+      console.error('Failed to request team deletion');
+    }
+  };
+
+  const handleDeleteRequestResponse = async (request, accept) => {
+    try {
+      const token = getToken();
+      const requestId = request._id || request.id;
+      
+      const response = await fetch(`${API_URL}/teams/delete-requests/${requestId}/respond`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ accept })
+      });
+
+      if (response.ok) {
+        await fetchDeleteRequests();
+        await fetchMyTeams();
+      }
+    } catch (err) {
+      console.error('Failed to respond to delete request');
     }
   };
 
@@ -435,10 +516,10 @@ const FullDashboard = ({ user }) => {
 
         <nav className="nav-section">
           <a href="#" className="nav-item active">Dashboard</a>
-          {pendingInvites.length > 0 && (
+          {(pendingInvites.length > 0 || deleteRequests.length > 0) && (
             <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); setShowInvites(true); }}>
-              Invites
-              <span className="badge">{pendingInvites.length}</span>
+              Requests
+              <span className="badge">{pendingInvites.length + deleteRequests.length}</span>
             </a>
           )}
         </nav>
@@ -596,7 +677,7 @@ const FullDashboard = ({ user }) => {
             ) : (
               <div className="teams-grid">
                 {myTeams.filter(t => t.status === 'active').map(team => (
-                  <div key={team.id} className="team-card" onClick={() => goToTeamKanban(team)}>
+                  <div key={team._id || team.id} className="team-card" onClick={() => goToTeamKanban(team)}>
                     <div className="team-header">
                       <div className="team-avatars">
                         {team.members.slice(0, 3).map((member, idx) => (
@@ -613,6 +694,12 @@ const FullDashboard = ({ user }) => {
                         <div className="team-name">{team.name}</div>
                         <div className="team-project">{team.project.name}</div>
                       </div>
+                      <button 
+                        className="team-delete" 
+                        onClick={(e) => handleDeleteTeam(team, e)}
+                        title="Delete team"
+                      >
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -805,41 +892,98 @@ const FullDashboard = ({ user }) => {
         </div>
       )}
 
+      {showDeleteConfirm && teamToDelete && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal modal-confirm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Delete Team?</h2>
+              <button className="modal-close" onClick={() => setShowDeleteConfirm(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete <strong>{teamToDelete.name}</strong>?</p>
+              <p>All team members will need to approve this deletion request.</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+              <button className="btn-danger" onClick={confirmDeleteTeam}>Request Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showInvites && (
         <div className="modal-overlay" onClick={() => setShowInvites(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Team Invitations</h2>
+              <h2>Team Requests</h2>
               <button className="modal-close" onClick={() => setShowInvites(false)}>×</button>
             </div>
             <div className="modal-body">
-              {pendingInvites.length === 0 ? (
-                <p>No pending invitations</p>
+              {pendingInvites.length === 0 && deleteRequests.length === 0 ? (
+                <p>No pending requests</p>
               ) : (
-                <div className="invites-list">
-                  {pendingInvites.map(invite => (
-                    <div key={invite.id} className="invite-item">
-                      <div className="invite-info">
-                        <div className="invite-team-name">{invite.name}</div>
-                        <div className="invite-project">{invite.project.name}</div>
-                        <div className="invite-creator">by @{invite.creator.login}</div>
+                <div className="requests-container">
+                  {pendingInvites.length > 0 && (
+                    <>
+                      <h3 className="requests-section-title">Team Invitations</h3>
+                      <div className="invites-list">
+                        {pendingInvites.map(invite => (
+                          <div key={invite._id || invite.id} className="invite-item">
+                            <div className="invite-info">
+                              <div className="invite-team-name">{invite.name}</div>
+                              <div className="invite-project">{invite.project.name}</div>
+                              <div className="invite-creator">by @{invite.creator.login}</div>
+                            </div>
+                            <div className="invite-actions">
+                              <button 
+                                className="btn-accept"
+                                onClick={() => handleInviteResponse(invite, true)}
+                              >
+                                Accept
+                              </button>
+                              <button 
+                                className="btn-decline"
+                                onClick={() => handleInviteResponse(invite, false)}
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="invite-actions">
-                        <button 
-                          className="btn-accept"
-                          onClick={() => handleInviteResponse(invite.id, true)}
-                        >
-                          Accept
-                        </button>
-                        <button 
-                          className="btn-decline"
-                          onClick={() => handleInviteResponse(invite.id, false)}
-                        >
-                          Decline
-                        </button>
+                    </>
+                  )}
+
+                  {deleteRequests.length > 0 && (
+                    <>
+                      <h3 className="requests-section-title">Deletion Requests</h3>
+                      <div className="invites-list">
+                        {deleteRequests.map(request => (
+                          <div key={request._id || request.id} className="invite-item delete-request">
+                            <div className="invite-info">
+                              <div className="invite-team-name">{request.teamName}</div>
+                              <div className="invite-project">{request.project.name}</div>
+                              <div className="invite-creator">@{request.requestedBy.login} wants to delete this team</div>
+                            </div>
+                            <div className="invite-actions">
+                              <button 
+                                className="btn-accept"
+                                onClick={() => handleDeleteRequestResponse(request, true)}
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                className="btn-decline"
+                                onClick={() => handleDeleteRequestResponse(request, false)}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}
+                    </>
+                  )}
                 </div>
               )}
             </div>
