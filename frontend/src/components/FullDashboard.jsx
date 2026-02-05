@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { removeToken, getToken } from '../utils/auth';
 import '../styles/FullDashboard.css';
@@ -112,14 +112,43 @@ const FullDashboard = ({ user }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [myTeams, setMyTeams] = useState(() => {
-    const saved = sessionStorage.getItem('myTeams');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [myTeams, setMyTeams] = useState([]);
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [showInvites, setShowInvites] = useState(false);
 
-  const saveTeams = (teams) => {
-    setMyTeams(teams);
-    sessionStorage.setItem('myTeams', JSON.stringify(teams));
+  useEffect(() => {
+    fetchMyTeams();
+    fetchPendingInvites();
+  }, []);
+
+  const fetchMyTeams = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/teams/my-teams`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMyTeams(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch teams');
+    }
+  };
+
+  const fetchPendingInvites = async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/teams/pending`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPendingInvites(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch invites');
+    }
   };
 
   const handleLogout = useCallback(() => {
@@ -178,6 +207,7 @@ const FullDashboard = ({ user }) => {
   const canCreateTeam = teamName.trim() !== '' && selectedMembers.length > 0;
 
   const username = user?.login || 'user';
+  const userId = user?.id;
   const campus = user?.campus || 'Campus';
   const wallet = user?.wallet || 0;
   const correctionPoints = user?.correctionPoints || user?.correction_point || 0;
@@ -284,7 +314,7 @@ const FullDashboard = ({ user }) => {
 
   const handleProjectClick = (project) => {
     if (project.team > 1) {
-      const existingTeam = myTeams.find(t => t.project.slug === project.slug);
+      const existingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'active');
       if (existingTeam) {
         navigate(`/kanban/${project.slug}`);
         return;
@@ -296,26 +326,54 @@ const FullDashboard = ({ user }) => {
     }
   };
 
-  const deleteTeam = (teamId, e) => {
-    e.stopPropagation();
-    const updated = myTeams.filter(t => t.id !== teamId);
-    saveTeams(updated);
-  };
-
-  const handleTeamCreated = () => {
+  const handleTeamCreated = async () => {
     if (!canCreateTeam) return;
     
-    const newTeam = {
-      id: Date.now(),
-      name: teamName,
-      project: selectedProject,
-      members: [{ login: username, avatar: avatarUrl }, ...selectedMembers],
-      createdAt: new Date()
-    };
-    
-    saveTeams([...myTeams, newTeam]);
-    setShowCreateTeam(false);
-    resetTeamModal();
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/teams`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: teamName,
+          projectSlug: selectedProject.slug,
+          projectName: selectedProject.name,
+          memberIds: selectedMembers.map(m => m.id)
+        })
+      });
+
+      if (response.ok) {
+        await fetchMyTeams();
+        setShowCreateTeam(false);
+        resetTeamModal();
+      }
+    } catch (err) {
+      console.error('Failed to create team');
+    }
+  };
+
+  const handleInviteResponse = async (teamId, accept) => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/teams/${teamId}/respond`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ accept })
+      });
+
+      if (response.ok) {
+        await fetchPendingInvites();
+        await fetchMyTeams();
+      }
+    } catch (err) {
+      console.error('Failed to respond to invite');
+    }
   };
 
   const goToTeamKanban = (team) => {
@@ -377,6 +435,12 @@ const FullDashboard = ({ user }) => {
 
         <nav className="nav-section">
           <a href="#" className="nav-item active">Dashboard</a>
+          {pendingInvites.length > 0 && (
+            <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); setShowInvites(true); }}>
+              Invites
+              <span className="badge">{pendingInvites.length}</span>
+            </a>
+          )}
         </nav>
 
         <div className="nav-divider"></div>
@@ -495,19 +559,21 @@ const FullDashboard = ({ user }) => {
             <div className="projects-grid">
               {circleProjects.map((project, idx) => {
                 const badge = getStatusBadge(project.userStatus);
-                const hasTeam = project.team > 1 && myTeams.some(t => t.project.slug === project.slug);
+                const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'active');
+                const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+                
                 return (
                   <div 
                     key={idx} 
-                    className={`project-card ${hasTeam ? 'has-team' : ''}`}
-                    onClick={() => !hasTeam && handleProjectClick(project)}
+                    className={`project-card ${activeTeam ? 'has-team' : ''} ${pendingTeam ? 'pending-team' : ''}`}
+                    onClick={() => !activeTeam && !pendingTeam && handleProjectClick(project)}
                   >
                     <div className="project-header">
                       <div className="project-icon">
                         {project.name.substring(0, 2).toUpperCase()}
                       </div>
-                      <span className={`project-badge ${badge.className}`}>
-                        {hasTeam ? 'Team Created' : badge.text}
+                      <span className={`project-badge ${activeTeam ? 'badge-completed' : pendingTeam ? 'badge-pending' : badge.className}`}>
+                        {activeTeam ? 'Active Team' : pendingTeam ? 'Pending' : badge.text}
                       </span>
                     </div>
                     <div className="project-name">{project.name}</div>
@@ -523,13 +589,13 @@ const FullDashboard = ({ user }) => {
               <h2>My Teams</h2>
             </div>
 
-            {myTeams.length === 0 ? (
+            {myTeams.filter(t => t.status === 'active').length === 0 ? (
               <div className="empty-teams">
-                <p>No teams yet. Create a team by clicking on a team project above.</p>
+                <p>No active teams yet. Create a team by clicking on a team project above.</p>
               </div>
             ) : (
               <div className="teams-grid">
-                {myTeams.map(team => (
+                {myTeams.filter(t => t.status === 'active').map(team => (
                   <div key={team.id} className="team-card" onClick={() => goToTeamKanban(team)}>
                     <div className="team-header">
                       <div className="team-avatars">
@@ -547,11 +613,6 @@ const FullDashboard = ({ user }) => {
                         <div className="team-name">{team.name}</div>
                         <div className="team-project">{team.project.name}</div>
                       </div>
-                      <button className="team-delete" onClick={(e) => deleteTeam(team.id, e)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/>
-                        </svg>
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -660,7 +721,7 @@ const FullDashboard = ({ user }) => {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Create Team</h2>
-              <button className="modal-close" onClick={closeModal}>x</button>
+              <button className="modal-close" onClick={closeModal}>×</button>
             </div>
             <div className="modal-body">
               <p><strong>{selectedProject.name}</strong></p>
@@ -669,7 +730,7 @@ const FullDashboard = ({ user }) => {
               <div className="team-form">
                 <input 
                   type="text" 
-                  placeholder="Team name *" 
+                  placeholder="Team name" 
                   className={`team-input ${!teamName.trim() ? 'input-required' : ''}`}
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
@@ -724,7 +785,7 @@ const FullDashboard = ({ user }) => {
                         <div className="member-avatar-placeholder">{member.login.slice(0, 2).toUpperCase()}</div>
                       )}
                       <span>{member.login}</span>
-                      <button className="remove-member" onClick={() => removeMember(member.id)}>x</button>
+                      <button className="remove-member" onClick={() => removeMember(member.id)}>×</button>
                     </div>
                   ))}
                 </div>
@@ -739,6 +800,48 @@ const FullDashboard = ({ user }) => {
               >
                 Create Team
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInvites && (
+        <div className="modal-overlay" onClick={() => setShowInvites(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Team Invitations</h2>
+              <button className="modal-close" onClick={() => setShowInvites(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {pendingInvites.length === 0 ? (
+                <p>No pending invitations</p>
+              ) : (
+                <div className="invites-list">
+                  {pendingInvites.map(invite => (
+                    <div key={invite.id} className="invite-item">
+                      <div className="invite-info">
+                        <div className="invite-team-name">{invite.name}</div>
+                        <div className="invite-project">{invite.project.name}</div>
+                        <div className="invite-creator">by @{invite.creator.login}</div>
+                      </div>
+                      <div className="invite-actions">
+                        <button 
+                          className="btn-accept"
+                          onClick={() => handleInviteResponse(invite.id, true)}
+                        >
+                          Accept
+                        </button>
+                        <button 
+                          className="btn-decline"
+                          onClick={() => handleInviteResponse(invite.id, false)}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
