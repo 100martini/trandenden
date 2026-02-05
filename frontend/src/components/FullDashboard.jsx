@@ -120,39 +120,33 @@ const FullDashboard = ({ user }) => {
   const [deleteRequests, setDeleteRequests] = useState([]);
 
   useEffect(() => {
+  fetchMyTeams();
+  fetchPendingInvites();
+  fetchDeleteRequests();
+
+  const interval = setInterval(() => {
     fetchMyTeams();
     fetchPendingInvites();
     fetchDeleteRequests();
-  }, []);
+  }, 3000);
+
+  return () => clearInterval(interval);
+}, []);
 
   const fetchMyTeams = async () => {
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_URL}/teams/my-teams`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-
-        setMyTeams(prev => {
-          const pending = prev.filter(t => t.status === 'pending_delete');
-          const pendingMap = new Map(pending.map(t => [t._id || t.id, t]));
-
-          const merged = data.map(t => {
-            const id = t._id || t.id;
-            if (pendingMap.has(id)) {
-              return { ...t, status: 'pending_delete' };
-            }
-            return t;
-          });
-
-          return merged;
-        });
-      }
-    } catch (err) {
-      console.error('Failed to fetch teams');
+  try {
+    const token = getToken();
+    const response = await fetch(`${API_URL}/teams/my-teams`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      setMyTeams(data);
     }
-  };
+  } catch (err) {
+    console.error('Failed to fetch teams');
+  }
+};
 
   const fetchPendingInvites = async () => {
     try {
@@ -438,14 +432,8 @@ const confirmDeleteTeam = async () => {
     });
 
     if (response.ok) {
-      setMyTeams(prev =>
-        prev.map(t =>
-          (t._id || t.id) === teamId
-            ? { ...t, status: 'pending_delete' }
-            : t
-        )
-      );
-
+      await fetchMyTeams();
+      await fetchDeleteRequests();
       setShowDeleteConfirm(false);
       setTeamToDelete(null);
     }
@@ -697,14 +685,19 @@ const confirmDeleteTeam = async () => {
               </div>
             ) : (
               <div className="teams-grid">
-                {myTeams.filter(t => t.status === 'active' || t.status === 'pending_delete').map(team => (
+                {myTeams.filter(t => t.status === 'active').map(team => {
+              const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedByLogin);
+
+              return (
                 <div
                   key={team._id || team.id}
-                  className={`team-card ${team.status === 'pending_delete' ? 'pending-delete' : ''}`}
-                  onClick={() => team.status !== 'pending_delete' && goToTeamKanban(team)}
+                  className={`team-card ${isPendingDelete ? 'pending-delete' : ''}`}
+                  onClick={() => !isPendingDelete && goToTeamKanban(team)}
                 >
-                  {team.status === 'pending_delete' && (
-                    <div className="pending-badge">Pending approval</div>
+                  {isPendingDelete && (
+                    <div className="pending-badge">
+                      Pending Deletion - @{team.deleteRequestedBy}
+                    </div>
                   )}
 
                   <div className="team-header">
@@ -723,18 +716,20 @@ const confirmDeleteTeam = async () => {
                       <div className="team-name">{team.name}</div>
                       <div className="team-project">{team.project.name}</div>
                     </div>
-                    <button 
-                      className="team-delete" 
-                      onClick={(e) => handleDeleteTeam(team, e)}
-                      title="Delete team"
-                      aria-label="Delete team"
-                    >
-                      <span className="trash-handle"></span>
-                    </button>
+                    
+                    {!isPendingDelete && (
+                      <button 
+                        className="team-delete" 
+                        onClick={(e) => handleDeleteTeam(team, e)}
+                        title="Delete team"
+                      >
+                        <span className="trash-handle"></span>
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
-
+              );
+            })}
               </div>
             )}
           </>

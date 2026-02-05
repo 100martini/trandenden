@@ -120,7 +120,18 @@ exports.getMyTeams = async (req, res) => {
       'members.id': userId
     }).sort({ createdAt: -1 });
 
-    res.json(teams);
+    const teamsWithDeleteInfo = teams.map(team => {
+      const teamObj = team.toObject();
+      
+      if (teamObj.deleteRequest) {
+        teamObj.hasPendingDelete = true;
+        teamObj.deleteRequestedBy = teamObj.deleteRequest.requestedByLogin;
+      }
+      
+      return teamObj;
+    });
+
+    res.json(teamsWithDeleteInfo);
   } catch (error) {
     console.error('Get my teams error:', error);
     res.status(500).json({ error: 'Failed to fetch teams' });
