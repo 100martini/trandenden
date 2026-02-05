@@ -12,18 +12,18 @@ exports.createTeam = async (req, res) => {
     }
 
     const memberUsers = await User.find({ _id: { $in: memberIds } });
-    
+
     const team = await Team.create({
       name,
       creatorId,
       project: { slug: projectSlug, name: projectName },
       status: 'pending',
       members: [
-        { 
-          id: creatorId, 
-          login: creator.login, 
+        {
+          id: creatorId,
+          login: creator.login,
           avatar: creator.avatar?.medium || creator.image?.versions?.medium,
-          status: 'accepted' 
+          status: 'accepted'
         },
         ...memberUsers.map(user => ({
           id: user.intraId,
@@ -45,13 +45,10 @@ exports.getPendingInvites = async (req, res) => {
   try {
     const currentUser = await User.findById(req.userId);
     const userId = currentUser.intraId;
-    
+
     const teams = await Team.find({
-      'members': {
-        $elemMatch: {
-          id: userId,
-          status: 'pending'
-        }
+      members: {
+        $elemMatch: { id: userId, status: 'pending' }
       }
     }).sort({ createdAt: -1 });
 
@@ -83,25 +80,25 @@ exports.respondToInvite = async (req, res) => {
     const userId = currentUser.intraId;
 
     const team = await Team.findById(teamId);
-    
+
     if (!team) {
       return res.status(404).json({ error: 'Team not found' });
     }
 
     const memberIndex = team.members.findIndex(m => m.id === userId);
-    
+
     if (memberIndex === -1) {
       return res.status(403).json({ error: 'Not a team member' });
     }
 
     if (accept) {
       team.members[memberIndex].status = 'accepted';
-      
+
       const allAccepted = team.members.every(m => m.status === 'accepted');
       if (allAccepted) {
         team.status = 'active';
       }
-      
+
       await team.save();
       res.json(team);
     } else {
@@ -118,7 +115,7 @@ exports.getMyTeams = async (req, res) => {
   try {
     const currentUser = await User.findById(req.userId);
     const userId = currentUser.intraId;
-    
+
     const teams = await Team.find({
       'members.id': userId
     }).sort({ createdAt: -1 });
@@ -137,7 +134,7 @@ exports.deleteTeam = async (req, res) => {
     const userId = currentUser.intraId;
 
     const team = await Team.findById(teamId);
-    
+
     if (!team) {
       return res.status(404).json({ error: 'Team not found' });
     }
@@ -151,5 +148,120 @@ exports.deleteTeam = async (req, res) => {
   } catch (error) {
     console.error('Delete team error:', error);
     res.status(500).json({ error: 'Failed to delete team' });
+  }
+};
+
+exports.requestDeleteTeam = async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    const currentUser = await User.findById(req.userId);
+    const userId = currentUser.intraId;
+
+    const team = await Team.findById(teamId);
+
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    const isMember = team.members.some(m => m.id === userId);
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not a team member' });
+    }
+
+    if (team.members.length === 1) {
+      await Team.deleteOne({ _id: teamId });
+      return res.json({ deleted: true });
+    }
+
+    const deleteRequest = {
+      teamName: team.name,
+      project: team.project,
+      requestedBy: userId,
+      requestedByLogin: currentUser.login,
+      approvals: [userId],
+      rejections: []
+    };
+
+    team.deleteRequest = deleteRequest;
+    await team.save();
+
+    res.json({ message: 'Delete request created', deleteRequest });
+  } catch (error) {
+    console.error('Request delete error:', error);
+    res.status(500).json({ error: 'Failed to request deletion' });
+  }
+};
+
+exports.getDeleteRequests = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.userId);
+    const userId = currentUser.intraId;
+
+    const teams = await Team.find({
+      'members.id': userId,
+      deleteRequest: { $exists: true }
+    });
+
+    const requests = teams
+      .map(team => ({
+        _id: team._id,
+        teamId: team._id,
+        teamName: team.deleteRequest.teamName,
+        project: team.deleteRequest.project,
+        requestedBy: {
+          id: team.deleteRequest.requestedBy,
+          login: team.deleteRequest.requestedByLogin
+        },
+        approvals: team.deleteRequest.approvals,
+        rejections: team.deleteRequest.rejections
+      }))
+      .filter(req => req.requestedBy.id !== userId);
+
+    res.json(requests);
+  } catch (error) {
+    console.error('Get delete requests error:', error);
+    res.status(500).json({ error: 'Failed to fetch delete requests' });
+  }
+};
+
+exports.respondToDeleteRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { accept } = req.body;
+    const currentUser = await User.findById(req.userId);
+    const userId = currentUser.intraId;
+
+    const team = await Team.findById(requestId);
+
+    if (!team || !team.deleteRequest) {
+      return res.status(404).json({ error: 'Delete request not found' });
+    }
+
+    if (accept) {
+      if (!team.deleteRequest.approvals.includes(userId)) {
+        team.deleteRequest.approvals.push(userId);
+      }
+
+      team.deleteRequest.rejections = team.deleteRequest.rejections.filter(id => id !== userId);
+
+      const allApproved = team.members.every(m =>
+        team.deleteRequest.approvals.includes(m.id)
+      );
+
+      if (allApproved) {
+        await Team.deleteOne({ _id: team._id });
+        return res.json({ deleted: true });
+      }
+
+      await team.save();
+    } else {
+      team.deleteRequest = undefined;
+      await team.save();
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Respond to delete request error:', error);
+    res.status(500).json({ error: 'Failed to respond to delete request' });
   }
 };

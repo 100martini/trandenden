@@ -133,7 +133,21 @@ const FullDashboard = ({ user }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        setMyTeams(data);
+
+        setMyTeams(prev => {
+          const pending = prev.filter(t => t.status === 'pending_delete');
+          const pendingMap = new Map(pending.map(t => [t._id || t.id, t]));
+
+          const merged = data.map(t => {
+            const id = t._id || t.id;
+            if (pendingMap.has(id)) {
+              return { ...t, status: 'pending_delete' };
+            }
+            return t;
+          });
+
+          return merged;
+        });
       }
     } catch (err) {
       console.error('Failed to fetch teams');
@@ -408,31 +422,38 @@ const FullDashboard = ({ user }) => {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDeleteTeam = async () => {
-    if (!teamToDelete) return;
-    
-    try {
-      const token = getToken();
-      const teamId = teamToDelete._id || teamToDelete.id;
-      
-      const response = await fetch(`${API_URL}/teams/${teamId}/request-delete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+const confirmDeleteTeam = async () => {
+  if (!teamToDelete) return;
 
-      if (response.ok) {
-        await fetchMyTeams();
-        await fetchDeleteRequests();
-        setShowDeleteConfirm(false);
-        setTeamToDelete(null);
+  try {
+    const token = getToken();
+    const teamId = teamToDelete._id || teamToDelete.id;
+
+    const response = await fetch(`${API_URL}/teams/${teamId}/request-delete`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    } catch (err) {
-      console.error('Failed to request team deletion');
+    });
+
+    if (response.ok) {
+      setMyTeams(prev =>
+        prev.map(t =>
+          (t._id || t.id) === teamId
+            ? { ...t, status: 'pending_delete' }
+            : t
+        )
+      );
+
+      setShowDeleteConfirm(false);
+      setTeamToDelete(null);
     }
-  };
+  } catch (err) {
+    console.error('Failed to request team deletion');
+  }
+};
+
 
   const handleDeleteRequestResponse = async (request, accept) => {
     try {
@@ -670,39 +691,50 @@ const FullDashboard = ({ user }) => {
               <h2>My Teams</h2>
             </div>
 
-            {myTeams.filter(t => t.status === 'active').length === 0 ? (
+            {myTeams.filter(t => t.status === 'active' || t.status === 'pending_delete').length === 0 ? (
               <div className="empty-teams">
                 <p>No active teams yet. Create a team by clicking on a team project above.</p>
               </div>
             ) : (
               <div className="teams-grid">
-                {myTeams.filter(t => t.status === 'active').map(team => (
-                  <div key={team._id || team.id} className="team-card" onClick={() => goToTeamKanban(team)}>
-                    <div className="team-header">
-                      <div className="team-avatars">
-                        {team.members.slice(0, 3).map((member, idx) => (
-                          member.avatar ? (
-                            <img key={idx} src={member.avatar} alt={member.login} className="team-header-avatar" title={member.login} />
-                          ) : (
-                            <div key={idx} className="team-header-placeholder" title={member.login}>
-                              {member.login.slice(0, 2).toUpperCase()}
-                            </div>
-                          )
-                        ))}
-                      </div>
-                      <div className="team-info">
-                        <div className="team-name">{team.name}</div>
-                        <div className="team-project">{team.project.name}</div>
-                      </div>
-                      <button 
-                        className="team-delete" 
-                        onClick={(e) => handleDeleteTeam(team, e)}
-                        title="Delete team"
-                      >
-                      </button>
+                {myTeams.filter(t => t.status === 'active' || t.status === 'pending_delete').map(team => (
+                <div
+                  key={team._id || team.id}
+                  className={`team-card ${team.status === 'pending_delete' ? 'pending-delete' : ''}`}
+                  onClick={() => team.status !== 'pending_delete' && goToTeamKanban(team)}
+                >
+                  {team.status === 'pending_delete' && (
+                    <div className="pending-badge">Pending approval</div>
+                  )}
+
+                  <div className="team-header">
+                    <div className="team-avatars">
+                      {team.members.slice(0, 3).map((member, idx) => (
+                        member.avatar ? (
+                          <img key={idx} src={member.avatar} alt={member.login} className="team-header-avatar" title={member.login} />
+                        ) : (
+                          <div key={idx} className="team-header-placeholder" title={member.login}>
+                            {member.login.slice(0, 2).toUpperCase()}
+                          </div>
+                        )
+                      ))}
                     </div>
+                    <div className="team-info">
+                      <div className="team-name">{team.name}</div>
+                      <div className="team-project">{team.project.name}</div>
+                    </div>
+                    <button 
+                      className="team-delete" 
+                      onClick={(e) => handleDeleteTeam(team, e)}
+                      title="Delete team"
+                      aria-label="Delete team"
+                    >
+                      <span className="trash-handle"></span>
+                    </button>
                   </div>
-                ))}
+                </div>
+              ))}
+
               </div>
             )}
           </>
