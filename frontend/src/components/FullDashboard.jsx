@@ -22,11 +22,11 @@ const OLD_CURRICULUM = {
   ],
   3: [
     { slug: 'philosophers', name: 'Philosophers', team: 1 },
-    { slug: 'minishell', name: 'minishell', team: 2 }
+    { slug: 'minishell', name: 'minishell', team: 2, maxTeam: 2 }
   ],
   4: [
-    { slug: 'cub3d', name: 'cub3D', team: 2, alt: 'minirt' },
-    { slug: 'minirt', name: 'miniRT', team: 2, alt: 'cub3d' },
+    { slug: 'cub3d', name: 'cub3D', team: 2, maxTeam: 2, alt: 'minirt' },
+    { slug: 'minirt', name: 'miniRT', team: 2, maxTeam: 2, alt: 'cub3d' },
     { slug: 'netpractice', name: 'NetPractice', team: 1 },
     { slug: 'cpp-module-00', name: 'CPP Module 00', team: 1 },
     { slug: 'cpp-module-01', name: 'CPP Module 01', team: 1 },
@@ -35,8 +35,8 @@ const OLD_CURRICULUM = {
     { slug: 'cpp-module-04', name: 'CPP Module 04', team: 1 }
   ],
   5: [
-    { slug: 'webserv', name: 'webserv', team: 3 },
-    { slug: 'ft_irc', name: 'ft_irc', team: 3, alt: 'webserv' },
+    { slug: 'webserv', name: 'webserv', team: 2, maxTeam: 3 },
+    { slug: 'ft_irc', name: 'ft_irc', team: 2, maxTeam: 3, alt: 'webserv' },
     { slug: 'cpp-module-05', name: 'CPP Module 05', team: 1 },
     { slug: 'cpp-module-06', name: 'CPP Module 06', team: 1 },
     { slug: 'cpp-module-07', name: 'CPP Module 07', team: 1 },
@@ -45,8 +45,8 @@ const OLD_CURRICULUM = {
     { slug: 'inception', name: 'Inception', team: 1 }
   ],
   6: [
-    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 5 },
-    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2 }
+    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 4, maxTeam: 5 },
+    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2, maxTeam: 2 }
   ]
 };
 
@@ -70,7 +70,7 @@ const NEW_CURRICULUM = {
     { slug: 'python-module-08', name: 'Python Module 08', team: 1 },
     { slug: 'python-module-09', name: 'Python Module 09', team: 1 },
     { slug: 'python-module-10', name: 'Python Module 10', team: 1 },
-    { slug: 'a-maze-ing', name: 'A-Maze-ing', team: 2 }
+    { slug: 'a-maze-ing', name: 'A-Maze-ing', team: 2, maxTeam: 2 }
   ],
   3: [
     { slug: 'codexion', name: 'Codexion', team: 1 },
@@ -79,17 +79,17 @@ const NEW_CURRICULUM = {
   ],
   4: [
     { slug: 'netpractice', name: 'NetPractice', team: 1 },
-    { slug: 'pac-man', name: 'Pac-Man', team: 2 },
+    { slug: 'pac-man', name: 'Pac-Man', team: 2, maxTeam: 2 },
     { slug: 'rag-against-the-machine', name: 'RAG against the machine', team: 1 }
   ],
   5: [
-    { slug: 'agent-smith', name: 'Agent Smith', team: 3 },
-    { slug: 'the-answer-protocol', name: 'The Answer Protocol', team: 3 },
+    { slug: 'agent-smith', name: 'Agent Smith', team: 2, maxTeam: 3 },
+    { slug: 'the-answer-protocol', name: 'The Answer Protocol', team: 2, maxTeam: 3 },
     { slug: 'inception', name: 'Inception', team: 1 }
   ],
   6: [
-    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 5 },
-    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2 }
+    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 4, maxTeam: 5 },
+    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2, maxTeam: 2 }
   ]
 };
 
@@ -120,33 +120,33 @@ const FullDashboard = ({ user }) => {
   const [deleteRequests, setDeleteRequests] = useState([]);
 
   useEffect(() => {
-  fetchMyTeams();
-  fetchPendingInvites();
-  fetchDeleteRequests();
-
-  const interval = setInterval(() => {
     fetchMyTeams();
     fetchPendingInvites();
     fetchDeleteRequests();
-  }, 3000);
 
-  return () => clearInterval(interval);
-}, []);
+    const interval = setInterval(() => {
+      fetchMyTeams();
+      fetchPendingInvites();
+      fetchDeleteRequests();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchMyTeams = async () => {
-  try {
-    const token = getToken();
-    const response = await fetch(`${API_URL}/teams/my-teams`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (response.ok) {
-      const data = await response.json();
-      setMyTeams(data);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/teams/my-teams`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMyTeams(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch teams');
     }
-  } catch (err) {
-    console.error('Failed to fetch teams');
-  }
-};
+  };
 
   const fetchPendingInvites = async () => {
     try {
@@ -180,6 +180,8 @@ const FullDashboard = ({ user }) => {
 
   const handleLogout = useCallback(() => {
     removeToken();
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('welcomeShown');
     navigate('/login');
   }, [navigate]);
 
@@ -209,7 +211,7 @@ const FullDashboard = ({ user }) => {
   };
 
   const addMember = (member) => {
-    const maxMembers = (selectedProject?.team || 2) - 1;
+    const maxMembers = (selectedProject?.maxTeam || selectedProject?.team || 2) - 1;
     if (selectedMembers.length >= maxMembers) {
       return;
     }
@@ -231,10 +233,12 @@ const FullDashboard = ({ user }) => {
     setSelectedMembers([]);
   };
 
-  const canCreateTeam = teamName.trim() !== '' && selectedMembers.length > 0;
+  const minMembers = (selectedProject?.team || 2) - 1;
+  const maxMembers = (selectedProject?.maxTeam || selectedProject?.team || 2) - 1;
+  const canCreateTeam = teamName.trim() !== '' && selectedMembers.length >= minMembers;
 
   const username = user?.login || 'user';
-  const userId = user?.id;
+  const currentUserId = user?.intraId || user?.id;
   const campus = user?.campus || 'Campus';
   const wallet = user?.wallet || 0;
   const correctionPoints = user?.correctionPoints || user?.correction_point || 0;
@@ -346,6 +350,10 @@ const FullDashboard = ({ user }) => {
         navigate(`/kanban/${project.slug}`);
         return;
       }
+      const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+      if (pendingTeam) {
+        return; // Don't allow creating new team if one is pending
+      }
       setSelectedProject(project);
       setShowCreateTeam(true);
     } else {
@@ -387,11 +395,6 @@ const FullDashboard = ({ user }) => {
       const token = getToken();
       const teamId = team._id || team.id;
       
-      if (!teamId) {
-        console.error('No team ID found:', team);
-        return;
-      }
-      
       const response = await fetch(`${API_URL}/teams/${teamId}/respond`, {
         method: 'PATCH',
         headers: {
@@ -416,32 +419,31 @@ const FullDashboard = ({ user }) => {
     setShowDeleteConfirm(true);
   };
 
-const confirmDeleteTeam = async () => {
-  if (!teamToDelete) return;
+  const confirmDeleteTeam = async () => {
+    if (!teamToDelete) return;
+    
+    try {
+      const token = getToken();
+      const teamId = teamToDelete._id || teamToDelete.id;
+      
+      const response = await fetch(`${API_URL}/teams/${teamId}/request-delete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-  try {
-    const token = getToken();
-    const teamId = teamToDelete._id || teamToDelete.id;
-
-    const response = await fetch(`${API_URL}/teams/${teamId}/request-delete`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+      if (response.ok) {
+        await fetchMyTeams();
+        await fetchDeleteRequests();
+        setShowDeleteConfirm(false);
+        setTeamToDelete(null);
       }
-    });
-
-    if (response.ok) {
-      await fetchMyTeams();
-      await fetchDeleteRequests();
-      setShowDeleteConfirm(false);
-      setTeamToDelete(null);
+    } catch (err) {
+      console.error('Failed to request team deletion');
     }
-  } catch (err) {
-    console.error('Failed to request team deletion');
-  }
-};
-
+  };
 
   const handleDeleteRequestResponse = async (request, accept) => {
     try {
@@ -498,6 +500,10 @@ const confirmDeleteTeam = async () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  const validDeleteRequests = useMemo(() => 
+    deleteRequests.filter(req => req.requestedBy?.login && req.teamName),
+  [deleteRequests]);
+
   const totalActive = allProjects.filter(p => 
     p.status === 'in_progress' || p.status === 'searching_a_group'
   ).length;
@@ -525,10 +531,10 @@ const confirmDeleteTeam = async () => {
 
         <nav className="nav-section">
           <a href="#" className="nav-item active">Dashboard</a>
-          {(pendingInvites.length > 0 || deleteRequests.length > 0) && (
+          {(pendingInvites.length > 0 || validDeleteRequests.length > 0) && (
             <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); setShowInvites(true); }}>
               Requests
-              <span className="badge">{pendingInvites.length + deleteRequests.length}</span>
+              <span className="badge">{pendingInvites.length + validDeleteRequests.length}</span>
             </a>
           )}
         </nav>
@@ -679,57 +685,57 @@ const confirmDeleteTeam = async () => {
               <h2>My Teams</h2>
             </div>
 
-            {myTeams.filter(t => t.status === 'active' || t.status === 'pending_delete').length === 0 ? (
+            {myTeams.filter(t => t.status === 'active').length === 0 ? (
               <div className="empty-teams">
                 <p>No active teams yet. Create a team by clicking on a team project above.</p>
               </div>
             ) : (
               <div className="teams-grid">
                 {myTeams.filter(t => t.status === 'active').map(team => {
-              const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedByLogin);
-
-              return (
-                <div
-                  key={team._id || team.id}
-                  className={`team-card ${isPendingDelete ? 'pending-delete' : ''}`}
-                  onClick={() => !isPendingDelete && goToTeamKanban(team)}
-                >
-                  {isPendingDelete && (
-                    <div className="pending-badge">
-                      Pending Deletion - @{team.deleteRequestedBy}
+                  const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy && team.deleteRequest.requestedByLogin);
+                  
+                  return (
+                    <div 
+                      key={team._id || team.id} 
+                      className={`team-card ${isPendingDelete ? 'pending-delete' : ''}`}
+                      onClick={() => !isPendingDelete && goToTeamKanban(team)}
+                    >
+                      {isPendingDelete && (
+                        <div className="pending-badge">
+                          @{team.deleteRequest.requestedByLogin}
+                        </div>
+                      )}
+                      <div className="team-header">
+                        <div className="team-avatars">
+                          {team.members.slice(0, 3).map((member, idx) => (
+                            member.avatar ? (
+                              <img key={idx} src={member.avatar} alt={member.login} className="team-header-avatar" title={member.login} />
+                            ) : (
+                              <div key={idx} className="team-header-placeholder" title={member.login}>
+                                {member.login.slice(0, 2).toUpperCase()}
+                              </div>
+                            )
+                          ))}
+                        </div>
+                        <div className="team-info">
+                          <div className="team-name">{team.name}</div>
+                          <div className="team-project">{team.project.name}</div>
+                        </div>
+                        {!isPendingDelete && (
+                          <button 
+                            className="team-delete" 
+                            onClick={(e) => handleDeleteTeam(team, e)}
+                            title="Delete team"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  )}
-
-                  <div className="team-header">
-                    <div className="team-avatars">
-                      {team.members.slice(0, 3).map((member, idx) => (
-                        member.avatar ? (
-                          <img key={idx} src={member.avatar} alt={member.login} className="team-header-avatar" title={member.login} />
-                        ) : (
-                          <div key={idx} className="team-header-placeholder" title={member.login}>
-                            {member.login.slice(0, 2).toUpperCase()}
-                          </div>
-                        )
-                      ))}
-                    </div>
-                    <div className="team-info">
-                      <div className="team-name">{team.name}</div>
-                      <div className="team-project">{team.project.name}</div>
-                    </div>
-                    
-                    {!isPendingDelete && (
-                      <button 
-                        className="team-delete" 
-                        onClick={(e) => handleDeleteTeam(team, e)}
-                        title="Delete team"
-                      >
-                        <span className="trash-handle"></span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
               </div>
             )}
           </>
@@ -835,16 +841,16 @@ const confirmDeleteTeam = async () => {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Create Team</h2>
-              <button className="modal-close" onClick={closeModal}>×</button>
+              <button className="modal-close" onClick={closeModal}>x</button>
             </div>
             <div className="modal-body">
               <p><strong>{selectedProject.name}</strong></p>
-              <p>Team size: {selectedProject.team} members (you + {selectedProject.team - 1} others)</p>
+              <p>Team size: {selectedProject.team}{selectedProject.maxTeam && selectedProject.maxTeam !== selectedProject.team ? `-${selectedProject.maxTeam}` : ''} members (you + {minMembers}{maxMembers !== minMembers ? `-${maxMembers}` : ''} others)</p>
               
               <div className="team-form">
                 <input 
                   type="text" 
-                  placeholder="Team name" 
+                  placeholder="Team name *" 
                   className={`team-input ${!teamName.trim() ? 'input-required' : ''}`}
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
@@ -857,10 +863,10 @@ const confirmDeleteTeam = async () => {
                     className="team-input"
                     value={searchQuery}
                     onChange={handleSearchChange}
-                    disabled={selectedMembers.length >= selectedProject.team - 1}
+                    disabled={selectedMembers.length >= maxMembers}
                   />
                   {searching && <div className="search-loading">Searching...</div>}
-                  {selectedMembers.length >= selectedProject.team - 1 && (
+                  {selectedMembers.length >= maxMembers && (
                     <div className="max-members-reached">Maximum team members reached</div>
                   )}
                   {searchResults.length > 0 && (
@@ -887,9 +893,9 @@ const confirmDeleteTeam = async () => {
                 </div>
 
                 <div className="selected-members">
-                  <p>Team Members: {selectedMembers.length}/{selectedProject.team - 1}</p>
-                  {selectedMembers.length === 0 && (
-                    <div className="no-members">Add at least one member to continue</div>
+                  <p>Team Members: {selectedMembers.length}/{minMembers}{maxMembers !== minMembers ? `-${maxMembers}` : ''}</p>
+                  {selectedMembers.length < minMembers && (
+                    <div className="no-members">Add at least {minMembers} member{minMembers > 1 ? 's' : ''} to continue</div>
                   )}
                   {selectedMembers.map(member => (
                     <div key={member.id} className="selected-member">
@@ -899,7 +905,7 @@ const confirmDeleteTeam = async () => {
                         <div className="member-avatar-placeholder">{member.login.slice(0, 2).toUpperCase()}</div>
                       )}
                       <span>{member.login}</span>
-                      <button className="remove-member" onClick={() => removeMember(member.id)}>×</button>
+                      <button className="remove-member" onClick={() => removeMember(member.id)}>x</button>
                     </div>
                   ))}
                 </div>
@@ -946,7 +952,7 @@ const confirmDeleteTeam = async () => {
               <button className="modal-close" onClick={() => setShowInvites(false)}>×</button>
             </div>
             <div className="modal-body">
-              {pendingInvites.length === 0 && deleteRequests.length === 0 ? (
+              {pendingInvites.length === 0 && validDeleteRequests.length === 0 ? (
                 <p>No pending requests</p>
               ) : (
                 <div className="requests-container">
@@ -959,7 +965,7 @@ const confirmDeleteTeam = async () => {
                             <div className="invite-info">
                               <div className="invite-team-name">{invite.name}</div>
                               <div className="invite-project">{invite.project.name}</div>
-                              <div className="invite-creator">by @{invite.creator.login}</div>
+                              <div className="invite-creator">by @{invite.creator?.login}</div>
                             </div>
                             <div className="invite-actions">
                               <button 
@@ -981,33 +987,43 @@ const confirmDeleteTeam = async () => {
                     </>
                   )}
 
-                  {deleteRequests.length > 0 && (
+                  {validDeleteRequests.length > 0 && (
                     <>
                       <h3 className="requests-section-title">Deletion Requests</h3>
                       <div className="invites-list">
-                        {deleteRequests.map(request => (
-                          <div key={request._id || request.id} className="invite-item delete-request">
-                            <div className="invite-info">
-                              <div className="invite-team-name">{request.teamName}</div>
-                              <div className="invite-project">{request.project.name}</div>
-                              <div className="invite-creator">@{request.requestedBy.login} wants to delete this team</div>
+                        {validDeleteRequests.map(request => {
+                          const hasResponded = request.approvals?.some(id => Number(id) === Number(currentUserId));
+                          
+                          return (
+                            <div key={request._id || request.id} className="invite-item delete-request">
+                              <div className="invite-info">
+                                <div className="invite-team-name">{request.teamName}</div>
+                                <div className="invite-project">{request.project?.name}</div>
+                                <div className="invite-creator">@{request.requestedBy?.login} wants to delete ({request.approvalCount}/{request.totalMembers} approved)</div>
+                              </div>
+                              <div className="invite-actions">
+                                {hasResponded ? (
+                                  <span className="response-status approved">Approved</span>
+                                ) : (
+                                  <>
+                                    <button 
+                                      className="btn-accept"
+                                      onClick={() => handleDeleteRequestResponse(request, true)}
+                                    >
+                                      Approve
+                                    </button>
+                                    <button 
+                                      className="btn-decline"
+                                      onClick={() => handleDeleteRequestResponse(request, false)}
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div className="invite-actions">
-                              <button 
-                                className="btn-accept"
-                                onClick={() => handleDeleteRequestResponse(request, true)}
-                              >
-                                Approve
-                              </button>
-                              <button 
-                                className="btn-decline"
-                                onClick={() => handleDeleteRequestResponse(request, false)}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   )}

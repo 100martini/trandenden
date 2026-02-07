@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { removeToken } from '../utils/auth';
@@ -8,19 +8,13 @@ import '../styles/Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(() => {
-    const cached = sessionStorage.getItem('user');
-    return cached ? JSON.parse(cached) : null;
-  });
-  const [loading, setLoading] = useState(!user);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(() => {
     return !sessionStorage.getItem('welcomeShown');
   });
-  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
     fetchUser();
   }, []);
 

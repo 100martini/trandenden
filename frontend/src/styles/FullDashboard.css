@@ -7,6 +7,7 @@
   --cream: #FAF0E6;
 }
 
+/* Custom scrollbar */
 .main::-webkit-scrollbar {
   width: 8px;
 }
@@ -102,7 +103,7 @@
 
 .nav-item .badge {
   margin-left: auto;
-  background: var(--cream);
+  background: var(--light);
   color: var(--dark);
   padding: 2px 8px;
   border-radius: 10px;
@@ -330,6 +331,7 @@
   color: var(--cream);
 }
 
+/* Circle Selector Styles */
 .circle-selector {
   display: flex;
   gap: 12px;
@@ -412,17 +414,6 @@
   border-style: solid;
 }
 
-.circle-btn.locked {
-  opacity: 0.25;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.circle-btn.locked:hover {
-  opacity: 0.25;
-  transform: none;
-}
-
 .circle-number {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 20px;
@@ -436,6 +427,7 @@
   margin-top: 4px;
 }
 
+/* Projects Grid */
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -449,34 +441,11 @@
   border-radius: 16px;
   padding: 24px;
   transition: all 0.2s;
-  cursor: pointer;
 }
 
 .project-card:hover {
   border-color: rgba(185, 180, 199, 0.2);
   transform: translateY(-2px);
-}
-
-.project-card.has-team {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.project-card.has-team:hover {
-  transform: none;
-  border-color: rgba(185, 180, 199, 0.08);
-}
-
-.project-card.pending-team {
-  opacity: 0.6;
-  cursor: not-allowed;
-  pointer-events: none;
-  border: 1px dashed rgba(251, 191, 36, 0.3);
-}
-
-.project-card.pending-team:hover {
-  transform: none;
 }
 
 .project-header {
@@ -528,17 +497,6 @@
   color: var(--light);
 }
 
-.badge-pending {
-  background: rgba(251, 191, 36, 0.12);
-  color: #fbbf24;
-}
-
-.badge-not-started {
-  background: rgba(185, 180, 199, 0.06);
-  color: var(--light);
-  opacity: 0.7;
-}
-
 .project-name {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 600;
@@ -563,12 +521,6 @@
   color: var(--cream);
 }
 
-.project-meta {
-  font-size: 12px;
-  color: var(--light);
-  margin-top: 8px;
-}
-
 .empty-state {
   background: var(--dark);
   border: 1px solid rgba(185, 180, 199, 0.08);
@@ -589,6 +541,74 @@
 .empty-state p {
   font-size: 14px;
   color: var(--light);
+}
+
+@media (max-width: 1400px) {
+  .projects-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 80px;
+    padding: 16px;
+  }
+  
+  .main {
+    margin-left: 80px;
+    padding: 24px 16px;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .logo-text,
+  .user-info,
+  .nav-item span:not(.badge) {
+    display: none;
+  }
+  
+  .stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .projects-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .circle-selector {
+    justify-content: center;
+  }
+
+  .circle-btn {
+    min-width: 60px;
+    padding: 10px 12px;
+  }
+}
+
+.circle-btn.locked {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.circle-btn.locked:hover {
+  opacity: 0.25;
+  transform: none;
 }
 
 .header-actions {
@@ -624,6 +644,22 @@
 
 .curriculum-notice strong {
   color: var(--cream);
+}
+
+.project-card {
+  cursor: pointer;
+}
+
+.project-meta {
+  font-size: 12px;
+  color: var(--light);
+  margin-top: 8px;
+}
+
+.badge-not-started {
+  background: rgba(185, 180, 199, 0.06);
+  color: var(--light);
+  opacity: 0.7;
 }
 
 .core-selector {
@@ -723,11 +759,10 @@
   background: none;
   border: none;
   color: var(--light);
-  font-size: 24px;
+  font-size: 20px;
   cursor: pointer;
   padding: 4px 8px;
   transition: color 0.2s;
-  line-height: 1;
 }
 
 .modal-close:hover {
@@ -849,13 +884,62 @@
   opacity: 0.5;
 }
 
-.team-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  min-height: 400px;
 }
 
-.input-required {
-  border-color: rgba(248, 113, 113, 0.5);
+.kanban-column {
+  background: var(--darkest);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.kanban-column h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cream);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(185, 180, 199, 0.1);
+}
+
+.kanban-card {
+  background: var(--dark);
+  border: 1px solid rgba(185, 180, 199, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--light);
+  cursor: grab;
+  transition: all 0.2s;
+}
+
+.kanban-card:hover {
+  border-color: rgba(185, 180, 199, 0.2);
+  color: var(--cream);
+}
+
+@media (max-width: 768px) {
+  .kanban-board {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-large {
+    max-width: 100%;
+  }
+  
+  .core-selector {
+    flex-direction: column;
+  }
+  
+  .core-btn {
+    padding: 16px 24px;
+  }
 }
 
 .search-container {
@@ -982,13 +1066,16 @@
   color: var(--light);
   cursor: pointer;
   padding: 4px 8px;
-  font-size: 16px;
+  font-size: 14px;
   transition: color 0.2s;
-  line-height: 1;
 }
 
 .remove-member:hover {
   color: #f87171;
+}
+
+.input-required {
+  border-color: rgba(248, 113, 113, 0.5);
 }
 
 .max-members-reached {
@@ -1004,6 +1091,21 @@
   opacity: 0.5;
   padding: 12px;
   text-align: center;
+}
+
+.btn-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.team-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .empty-teams {
@@ -1024,33 +1126,35 @@
 .teams-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-top: 16px;
+  gap: 16px;
+  margin-bottom: 32px;
 }
 
 .team-card {
   background: var(--dark);
-  border-radius: 12px;
   border: 1px solid rgba(185, 180, 199, 0.08);
-  padding: 16px;
+  border-radius: 16px;
+  padding: 16px 20px;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s;
   position: relative;
 }
 
 .team-card:hover {
+  border-color: rgba(185, 180, 199, 0.2);
   transform: translateY(-2px);
-  border-color: rgba(185, 180, 199, 0.18);
 }
 
 .team-card.pending-delete {
-  opacity: 0.5;
-  filter: grayscale(30%);
+  opacity: 0.7;
   pointer-events: none;
+  border: 1px dashed rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.03);
 }
 
 .team-card.pending-delete:hover {
   transform: none;
+  border-color: rgba(251, 191, 36, 0.4);
 }
 
 .team-header {
@@ -1091,34 +1195,14 @@
   color: var(--cream);
 }
 
-.team-info {
-  flex: 1;
-}
-
-.team-name {
-  font-family: 'Space Grotesk', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--cream);
-  margin-bottom: 4px;
-}
-
-.team-project {
-  font-size: 13px;
-  color: var(--light);
-}
-
 .team-delete {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: none;
+  border: none;
+  color: var(--light);
   cursor: pointer;
+  padding: 8px;
   opacity: 0;
-  transform: translateY(-2px);
-  transition: all 0.2s ease;
-  position: relative;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1126,66 +1210,48 @@
 
 .team-card:hover .team-delete {
   opacity: 1;
-  transform: translateY(0);
-}
-
-.team-delete::before {
-  content: '';
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  border-top: none;
-  border-radius: 0 0 3px 3px;
-  position: absolute;
-  bottom: 8px;
-  box-sizing: border-box;
-}
-
-.team-delete::after {
-  content: '';
-  width: 18px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 3px;
-  position: absolute;
-  top: 9px;
-}
-
-.trash-handle {
-  position: absolute;
-  top: 6px;
-  width: 8px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 2px;
 }
 
 .team-delete:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.2);
+  color: #f87171;
 }
 
-.team-delete:hover::before {
-  border-color: rgba(255, 255, 255, 0.9);
+.project-card.has-team {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
-.team-delete:hover::after {
-  background: rgba(255, 255, 255, 0.9);
+.project-card.has-team:hover {
+  transform: none;
+  border-color: rgba(185, 180, 199, 0.08);
 }
 
-.team-delete:hover .trash-handle {
-  background: rgba(255, 255, 255, 0.9);
+.project-card.pending-team {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+  border: 1px dashed rgba(251, 191, 36, 0.3);
+}
+
+.project-card.pending-team:hover {
+  transform: none;
+}
+
+.badge-pending {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
 }
 
 .pending-badge {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 8px;
+  right: 8px;
   background: rgba(251, 191, 36, 0.15);
   color: #fbbf24;
-  padding: 6px 12px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   border: 1px solid rgba(251, 191, 36, 0.3);
   z-index: 10;
@@ -1291,133 +1357,38 @@
   border-left: 3px solid #ef4444;
 }
 
-.kanban-board {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  min-height: 400px;
-}
-
-.kanban-column {
-  background: var(--darkest);
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.kanban-column h3 {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--cream);
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(185, 180, 199, 0.1);
-}
-
-.kanban-card {
-  background: var(--dark);
-  border: 1px solid rgba(185, 180, 199, 0.1);
+.response-status {
+  padding: 8px 16px;
   border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.response-status.approved {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.team-info {
+  flex: 1;
+}
+
+.team-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--cream);
+  margin-bottom: 4px;
+}
+
+.team-project {
   font-size: 13px;
   color: var(--light);
-  cursor: grab;
-  transition: all 0.2s;
-}
-
-.kanban-card:hover {
-  border-color: rgba(185, 180, 199, 0.2);
-  color: var(--cream);
-}
-
-@media (max-width: 1400px) {
-  .projects-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 1024px) {
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .info-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .teams-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .invite-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .invite-actions {
-    width: 100%;
-  }
-
-  .btn-accept,
-  .btn-decline {
-    flex: 1;
-  }
 }
 
 @media (max-width: 768px) {
-  .sidebar {
-    width: 80px;
-    padding: 16px;
-  }
-  
-  .main {
-    margin-left: 80px;
-    padding: 24px 16px;
-    max-height: 100vh;
-    overflow-y: auto;
-  }
-  
-  .logo-text,
-  .user-info,
-  .nav-item span:not(.badge) {
-    display: none;
-  }
-  
-  .stats {
+  .teams-grid {
     grid-template-columns: 1fr;
-  }
-  
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .projects-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .circle-selector {
-    justify-content: center;
-  }
-
-  .circle-btn {
-    min-width: 60px;
-    padding: 10px 12px;
-  }
-
-  .kanban-board {
-    grid-template-columns: 1fr;
-  }
-  
-  .modal-large {
-    max-width: 100%;
-  }
-  
-  .core-selector {
-    flex-direction: column;
-  }
-  
-  .core-btn {
-    padding: 16px 24px;
   }
 }
