@@ -19,11 +19,21 @@ const Dashboard = () => {
   }, []);
 
   const fetchUser = async () => {
+    const startTime = Date.now();
+    
     try {
       const response = await api.get('/auth/me');
       setUser(response.data);
       sessionStorage.setItem('user', JSON.stringify(response.data));
+      
+      // Ensure loading shows for at least 1.5 seconds
+      const elapsed = Date.now() - startTime;
+      const minLoadingTime = 1500;
+      const remaining = Math.max(0, minLoadingTime - elapsed);
+      
+      await new Promise(resolve => setTimeout(resolve, remaining));
       setLoading(false);
+      
     } catch (err) {
       removeToken();
       sessionStorage.removeItem('user');
@@ -39,9 +49,12 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="loading-screen">
-        <div className="loading-spinner"></div>
-        <p>Loading...</p>
+      <div className="loading-container">
+        <div className="loading-card">
+          <div className="loading-spinner"></div>
+          <h2>Fetching data from 42 API...</h2>
+          <p>Please wait</p>
+        </div>
       </div>
     );
   }

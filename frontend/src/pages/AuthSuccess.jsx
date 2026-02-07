@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { setToken } from '../utils/auth';
+import '../styles/Dashboard.css';
 
 const AuthSuccess = () => {
   const navigate = useNavigate();
@@ -18,16 +19,12 @@ const AuthSuccess = () => {
   }, [searchParams, navigate]);
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      background: '#201C2A',
-      color: '#FAF0E6',
-      fontFamily: 'Space Grotesk, sans-serif'
-    }}>
-      {/* Instant navigation - no loading screen */}
+    <div className="loading-container">
+      <div className="loading-card">
+        <div className="loading-spinner"></div>
+        <h2>Fetching data from 42 API...</h2>
+        <p>Please wait</p>
+      </div>
     </div>
   );
 };
