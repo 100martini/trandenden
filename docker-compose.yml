@@ -1,42 +1,5 @@
+
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - transcendence-net
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    command: mongod --quiet
-
-  mariadb:
-    image: mariadb:latest
-    container_name: mariadb
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: trandenden
-      MYSQL_USER: transcendence
-      MYSQL_PASSWORD: transcendence
-    ports:
-      - "3306:3306"
-    volumes:
-      - mariadb_data:/var/lib/mysql
-    networks:
-      - transcendence-net
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   backend:
     build:
       context: ./backend
@@ -44,11 +7,20 @@ services:
     container_name: backend
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "3000:3000"
     environment:
       - NODE_ENV=development
-      - MONGODB_URI=mongodb://mongodb:27017/trandenden
-      - PORT=3001
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongodb:27017/transcendence
+      - MARIADB_HOST=mariadb
+      - MARIADB_USER=root
+      - MARIADB_PASSWORD=root_password
+      - MARIADB_DATABASE=transcendence
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - FRONTEND_URL=http://localhost:5173
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - REDIRECT_URI=${REDIRECT_URI}
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -57,11 +29,6 @@ services:
       - mariadb
     networks:
       - transcendence-net
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   frontend:
     build:
@@ -72,7 +39,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://localhost:3001/api
+      - VITE_API_URL=http://localhost:3000/api
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -86,10 +53,37 @@ services:
         max-size: "10m"
         max-file: "3"
 
-volumes:
-  mongodb_data:
-  mariadb_data:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=transcendence
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - transcendence-net
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MARIADB_ROOT_PASSWORD=root_password
+      - MARIADB_DATABASE=transcendence
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - transcendence-net
 
 networks:
   transcendence-net:
     driver: bridge
+
+volumes:
+  mongodb_data:
+  mariadb_data:

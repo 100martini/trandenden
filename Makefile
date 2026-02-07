@@ -36,7 +36,7 @@ up:
 	@echo "$(GREEN)✓ All services started!$(NC)"
 	@echo ""
 	@echo "  Frontend:  $(CYAN)http://localhost:5173$(NC)"
-	@echo "  Backend:   $(CYAN)http://localhost:3001$(NC)"
+	@echo "  Backend:   $(CYAN)http://localhost:3000$(NC)"
 	@echo "  MongoDB:   $(CYAN)localhost:27017$(NC)"
 	@echo "  MariaDB:   $(CYAN)localhost:3306$(NC)"
 	@echo ""
