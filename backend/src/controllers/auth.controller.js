@@ -34,35 +34,32 @@ function calculateCurrentCircle(questsUsers) {
 
 function detectCurriculum(projectsUsers) {
   if (!projectsUsers || projectsUsers.length === 0) return 'unknown';
-  
   const projectSlugs = projectsUsers.map(p => (p.project?.slug || '').toLowerCase());
-  
   const hasBorn2beroot = projectSlugs.some(s => s.includes('born2beroot'));
   const hasPushSwap = projectSlugs.some(s => s.includes('push_swap') || s.includes('push-swap'));
   const hasCppModule = projectSlugs.some(s => s.includes('cpp-module') || s.includes('cpp_module'));
   const hasPythonModule = projectSlugs.some(s => s.includes('python'));
   const hasAMazeIng = projectSlugs.some(s => s.includes('maze'));
-  
+
   if (hasCppModule) return 'old';
   if (hasPythonModule || hasAMazeIng) return 'new';
-  
   if (hasBorn2beroot && !hasPushSwap) return 'old';
   if (hasPushSwap && !hasBorn2beroot) return 'new';
-  
-  const born2berootProject = projectsUsers.find(p => 
+
+  const born2berootProject = projectsUsers.find(p =>
     (p.project?.slug || '').toLowerCase().includes('born2beroot')
   );
-  const pushSwapProject = projectsUsers.find(p => 
+  const pushSwapProject = projectsUsers.find(p =>
     (p.project?.slug || '').toLowerCase().includes('push_swap') ||
     (p.project?.slug || '').toLowerCase().includes('push-swap')
   );
-  
+
   if (born2berootProject && pushSwapProject) {
     const born2berootDate = new Date(born2berootProject.created_at);
     const pushSwapDate = new Date(pushSwapProject.created_at);
     return born2berootDate < pushSwapDate ? 'old' : 'new';
   }
-  
+
   return 'unknown';
 }
 
@@ -82,6 +79,7 @@ class AuthController {
         scope: 'public',
         state: state
       });
+
       const authUrl = `${oauthConfig.authorizationURL}?${params.toString()}`;
       console.log('Redirecting to 42 OAuth...');
       res.redirect(authUrl);
@@ -105,13 +103,18 @@ class AuthController {
 
       console.log('Authorization code received');
       console.log('Exchanging code for access token...');
-      
-      const tokenResponse = await axios.post(oauthConfig.tokenURL, {
+
+      // Fix: Use URLSearchParams for form-urlencoded data
+      const params = new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: oauthConfig.clientId,
         client_secret: oauthConfig.clientSecret,
         code: code,
         redirect_uri: oauthConfig.redirectUri
+      });
+
+      const tokenResponse = await axios.post(oauthConfig.tokenURL, params, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
 
       const { access_token, refresh_token, expires_in } = tokenResponse.data;
@@ -131,7 +134,7 @@ class AuthController {
       const currentCircle = calculateCurrentCircle(questsUsers);
       const curriculum = detectCurriculum(profile.projects_users);
       const grade = getGrade(profile.cursus_users);
-      
+
       console.log('Quests found:', questsUsers.length);
       console.log('Current circle:', currentCircle);
       console.log('Curriculum:', curriculum);
@@ -157,7 +160,7 @@ class AuthController {
         wallet: profile.wallet,
         correctionPoints: profile.correction_point,
         correction_point: profile.correction_point,
-        level: profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
+        level: profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level ||
                profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0,
         cursusUsers: profile.cursus_users || [],
         projectsUsers: profile.projects_users || [],
@@ -190,7 +193,6 @@ class AuthController {
 
       console.log('JWT created, redirecting to frontend...');
       res.redirect(`${process.env.FRONTEND_URL}/auth/success?token=${jwtToken}`);
-
     } catch (error) {
       console.error('Auth callback error:', error.response?.data || error.message);
       res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
@@ -200,7 +202,6 @@ class AuthController {
   async getCurrentUser(req, res) {
     try {
       let user = await User.findById(req.userId).select('-accessToken -refreshToken');
-      
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -213,13 +214,13 @@ class AuthController {
             const response = await axios.get(`${oauthConfig.apiURL}/me`, {
               headers: { 'Authorization': `Bearer ${fullUser.accessToken}` }
             });
-            
+
             const profile = response.data;
             const questsUsers = await fetchUserQuests(fullUser.accessToken, fullUser.intraId);
             const currentCircle = calculateCurrentCircle(questsUsers);
             const curriculum = detectCurriculum(profile.projects_users);
 
-            user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
+            user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level ||
                          profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
             user.cursusUsers = profile.cursus_users || [];
             user.projectsUsers = profile.projects_users || [];
@@ -231,7 +232,6 @@ class AuthController {
             user.correction_point = profile.correction_point;
             user.image = profile.image;
             user.lastSyncedAt = new Date();
-            
             await user.save();
           }
         } catch (syncError) {
@@ -249,7 +249,6 @@ class AuthController {
   async refreshUserData(req, res) {
     try {
       const user = await User.findById(req.userId);
-      
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -261,13 +260,13 @@ class AuthController {
       const response = await axios.get(`${oauthConfig.apiURL}/me`, {
         headers: { 'Authorization': `Bearer ${user.accessToken}` }
       });
-      
+
       const profile = response.data;
       const questsUsers = await fetchUserQuests(user.accessToken, user.intraId);
       const currentCircle = calculateCurrentCircle(questsUsers);
       const curriculum = detectCurriculum(profile.projects_users);
 
-      user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level || 
+      user.level = profile.cursus_users?.find(c => c.cursus.slug === '42cursus')?.level ||
                    profile.cursus_users?.[profile.cursus_users.length - 1]?.level || 0;
       user.cursusUsers = profile.cursus_users || [];
       user.projectsUsers = profile.projects_users || [];
@@ -285,11 +284,9 @@ class AuthController {
       };
       user.image = profile.image;
       user.lastSyncedAt = new Date();
-      
       await user.save();
-      
+
       res.json({ message: 'Data refreshed successfully', user: user.toJSON() });
-      
     } catch (error) {
       console.error('Refresh user data error:', error.message);
       res.status(500).json({ error: 'Failed to refresh user data' });
@@ -314,6 +311,7 @@ class AuthController {
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
+
       res.json({
         currentCircle: user.currentCircle,
         curriculum: user.curriculum,
@@ -329,7 +327,7 @@ class AuthController {
     try {
       const { q } = req.query;
       const currentUser = await User.findById(req.userId);
-      
+
       if (!q || q.length < 2) {
         return res.json([]);
       }

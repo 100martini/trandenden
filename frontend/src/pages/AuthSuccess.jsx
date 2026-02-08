@@ -22,7 +22,7 @@ const AuthSuccess = () => {
     <div className="loading-container">
       <div className="loading-card">
         <div className="loading-spinner"></div>
-        <h2>Fetching data from 42 API...</h2>
+        <h2>Fetching data from 42 API</h2>
         <p>Please wait</p>
       </div>
     </div>
