@@ -38,20 +38,13 @@ A project management and collaboration platform for 42 Network students. Integra
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/trandenden.git
+git clone https://github.com/100martini/trandenden.git
 cd trandenden
 ```
 
 2. Create `backend/.env` with your credentials
-```env
-PORT=3000
-NODE_ENV=development
-FT_CLIENT_UID=your_client_id
-FT_CLIENT_SECRET=your_client_secret
-FT_REDIRECT_URI=http://localhost:3000/api/auth/callback
-FRONTEND_URL=http://localhost:5173
-JWT_SECRET=your_secret_key
-MONGODB_URI=mongodb://mongodb:27017/ft_transcendence
+```bash
+cp backend/.env.example backend/.env
 ```
 
 3. Start the application
@@ -61,16 +54,6 @@ make start
 ```
 
 4. Access at http://localhost:5173
-
-### Commands
-```bash
-make build      # Build Docker images
-make start      # Start all services
-make stop       # Stop all services
-make restart    # Restart services
-make logs       # View logs
-make clean      # Remove containers and volumes
-```
 
 ## Project Structure
 
