@@ -30,14 +30,13 @@ const teamSchema = new mongoose.Schema({
       default: 'pending'
     }
   }],
+  acceptances: [{ type: Number }],
   kanban: {
     todo: [{ type: mongoose.Schema.Types.Mixed }],
     inProgress: [{ type: mongoose.Schema.Types.Mixed }],
     review: [{ type: mongoose.Schema.Types.Mixed }],
     done: [{ type: mongoose.Schema.Types.Mixed }]
   },
-
-  // ADD THIS FIELD TO backend/src/models/team.model.js
   deleteRequest: {
     teamName: String,
     project: {

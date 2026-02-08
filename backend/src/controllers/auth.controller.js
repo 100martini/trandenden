@@ -104,7 +104,6 @@ class AuthController {
       console.log('Authorization code received');
       console.log('Exchanging code for access token...');
 
-      // Fix: Use URLSearchParams for form-urlencoded data
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: oauthConfig.clientId,

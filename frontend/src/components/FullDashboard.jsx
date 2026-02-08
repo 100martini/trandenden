@@ -382,6 +382,7 @@ const FullDashboard = ({ user }) => {
 
       if (response.ok) {
         await fetchMyTeams();
+        await fetchPendingInvites();
         setShowCreateTeam(false);
         resetTeamModal();
       }
@@ -663,19 +664,20 @@ const FullDashboard = ({ user }) => {
                 const badge = getStatusBadge(project.userStatus);
                 const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'active');
                 const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+                const hasPendingTeam = !!pendingTeam;
                 
                 return (
                   <div 
                     key={idx} 
-                    className={`project-card ${activeTeam ? 'has-team' : ''} ${pendingTeam ? 'pending-team' : ''}`}
-                    onClick={() => !activeTeam && !pendingTeam && handleProjectClick(project)}
+                    className={`project-card ${activeTeam ? 'has-team' : ''} ${hasPendingTeam ? 'pending-team' : ''}`}
+                    onClick={() => !activeTeam && !hasPendingTeam && handleProjectClick(project)}
                   >
                     <div className="project-header">
                       <div className="project-icon">
                         {project.name.substring(0, 2).toUpperCase()}
                       </div>
-                      <span className={`project-badge ${activeTeam ? 'badge-completed' : pendingTeam ? 'badge-pending' : badge.className}`}>
-                        {activeTeam ? 'Active Team' : pendingTeam ? 'Pending' : badge.text}
+                      <span className={`project-badge ${activeTeam ? 'badge-completed' : hasPendingTeam ? 'badge-pending' : badge.className}`}>
+                        {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : badge.text}
                       </span>
                     </div>
                     <div className="project-name">{project.name}</div>
@@ -691,24 +693,30 @@ const FullDashboard = ({ user }) => {
               <h2>My Teams</h2>
             </div>
 
-            {myTeams.filter(t => t.status === 'active').length === 0 ? (
+            {myTeams.filter(t => t.status === 'active' || t.isPending).length === 0 ? (
               <div className="empty-teams">
                 <p>No active teams yet. Create a team by clicking on a team project above.</p>
               </div>
             ) : (
               <div className="teams-grid">
-                {myTeams.filter(t => t.status === 'active').map(team => {
+                {myTeams.filter(t => t.status === 'active' || t.isPending).map(team => {
                   const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy && team.deleteRequest.requestedByLogin);
+                  const isPendingAcceptance = team.isPending && !isPendingDelete;
                   
                   return (
                     <div 
                       key={team._id || team.id} 
-                      className={`team-card ${isPendingDelete ? 'pending-delete' : ''}`}
-                      onClick={() => !isPendingDelete && goToTeamKanban(team)}
+                      className={`team-card ${isPendingDelete ? 'pending-delete' : ''} ${isPendingAcceptance ? 'pending-acceptance' : ''}`}
+                      onClick={() => !isPendingDelete && !isPendingAcceptance && goToTeamKanban(team)}
                     >
                       {isPendingDelete && (
                         <div className="pending-badge">
                           @{team.deleteRequest.requestedByLogin}
+                        </div>
+                      )}
+                      {isPendingAcceptance && (
+                        <div className="pending-badge acceptance">
+                          {team.acceptanceCount}/{team.totalMembers} accepted
                         </div>
                       )}
                       <div className="team-header">
@@ -727,7 +735,7 @@ const FullDashboard = ({ user }) => {
                           <div className="team-name">{team.name}</div>
                           <div className="team-project">{team.project.name}</div>
                         </div>
-                        {!isPendingDelete && (
+                        {!isPendingDelete && !isPendingAcceptance && (
                           <button 
                             className="team-delete" 
                             onClick={(e) => handleDeleteTeam(team, e)}
@@ -966,29 +974,41 @@ const FullDashboard = ({ user }) => {
                     <>
                       <h3 className="requests-section-title">Team Invitations</h3>
                       <div className="invites-list">
-                        {pendingInvites.map(invite => (
-                          <div key={invite._id || invite.id} className="invite-item">
-                            <div className="invite-info">
-                              <div className="invite-team-name">{invite.name}</div>
-                              <div className="invite-project">{invite.project.name}</div>
-                              <div className="invite-creator">by @{invite.creator?.login}</div>
+                        {pendingInvites.map(invite => {
+                          const hasAccepted = invite.acceptances?.some(id => Number(id) === Number(currentUserId));
+                          
+                          return (
+                            <div key={invite._id || invite.id} className="invite-item">
+                              <div className="invite-info">
+                                <div className="invite-team-name">{invite.name}</div>
+                                <div className="invite-project">{invite.project.name}</div>
+                                <div className="invite-creator">
+                                  by @{invite.creator?.login} ({invite.acceptanceCount || 0}/{invite.totalMembers || 0} accepted)
+                                </div>
+                              </div>
+                              <div className="invite-actions">
+                                {hasAccepted ? (
+                                  <span className="response-status approved">Accepted</span>
+                                ) : (
+                                  <>
+                                    <button 
+                                      className="btn-accept"
+                                      onClick={() => handleInviteResponse(invite, true)}
+                                    >
+                                      Accept
+                                    </button>
+                                    <button 
+                                      className="btn-decline"
+                                      onClick={() => handleInviteResponse(invite, false)}
+                                    >
+                                      Decline
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div className="invite-actions">
-                              <button 
-                                className="btn-accept"
-                                onClick={() => handleInviteResponse(invite, true)}
-                              >
-                                Accept
-                              </button>
-                              <button 
-                                className="btn-decline"
-                                onClick={() => handleInviteResponse(invite, false)}
-                              >
-                                Decline
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   )}

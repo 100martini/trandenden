@@ -31,7 +31,8 @@ exports.createTeam = async (req, res) => {
           avatar: user.avatar?.medium || user.image?.versions?.medium,
           status: 'pending'
         }))
-      ]
+      ],
+      acceptances: [creatorId]
     });
 
     res.json(team);
@@ -47,9 +48,9 @@ exports.getPendingInvites = async (req, res) => {
     const userId = currentUser.intraId;
 
     const teams = await Team.find({
-      members: {
-        $elemMatch: { id: userId, status: 'pending' }
-      }
+      'members.id': userId,
+      status: 'pending',
+      creatorId: { $ne: userId }
     }).sort({ createdAt: -1 });
 
     const teamsWithCreator = await Promise.all(
@@ -60,7 +61,9 @@ exports.getPendingInvites = async (req, res) => {
           creator: {
             login: creator?.login,
             avatar: creator?.avatar?.medium || creator?.image?.versions?.medium
-          }
+          },
+          acceptanceCount: (team.acceptances || []).length,
+          totalMembers: team.members.length
         };
       })
     );
@@ -93,14 +96,33 @@ exports.respondToInvite = async (req, res) => {
 
     if (accept) {
       team.members[memberIndex].status = 'accepted';
+      
+      const alreadyAccepted = (team.acceptances || []).some(
+        id => Number(id) === Number(userId)
+      );
+      
+      if (!alreadyAccepted) {
+        team.acceptances = team.acceptances || [];
+        team.acceptances.push(userId);
+      }
 
-      const allAccepted = team.members.every(m => m.status === 'accepted');
+      const allAccepted = team.members.every(member => 
+        (team.acceptances || []).some(
+          acceptanceId => Number(acceptanceId) === Number(member.id)
+        )
+      );
+
       if (allAccepted) {
         team.status = 'active';
       }
 
       await team.save();
-      res.json(team);
+      res.json({ 
+        success: true, 
+        acceptanceCount: team.acceptances.length,
+        totalMembers: team.members.length,
+        isActive: team.status === 'active'
+      });
     } else {
       await Team.deleteOne({ _id: teamId });
       res.json({ deleted: true });
@@ -117,7 +139,11 @@ exports.getMyTeams = async (req, res) => {
     const userId = currentUser.intraId;
 
     const teams = await Team.find({
-      'members.id': userId
+      'members.id': userId,
+      $or: [
+        { status: 'active' },
+        { status: 'pending', creatorId: userId }
+      ]
     }).sort({ createdAt: -1 });
 
     const teamsWithDeleteInfo = teams.map(team => {
@@ -126,6 +152,12 @@ exports.getMyTeams = async (req, res) => {
       if (teamObj.deleteRequest && teamObj.deleteRequest.requestedBy) {
         teamObj.hasPendingDelete = true;
         teamObj.deleteRequestedBy = teamObj.deleteRequest.requestedByLogin;
+      }
+      
+      if (teamObj.status === 'pending') {
+        teamObj.acceptanceCount = (teamObj.acceptances || []).length;
+        teamObj.totalMembers = teamObj.members.length;
+        teamObj.isPending = true;
       }
       
       return teamObj;
@@ -179,7 +211,7 @@ exports.requestDeleteTeam = async (req, res) => {
       return res.status(403).json({ error: 'Not a team member' });
     }
 
-    // If only one member (solo), delete directly
+    // if only one member (solo), delete directly
     if (team.members.length === 1) {
       await Team.deleteOne({ _id: teamId });
       return res.json({ deleted: true });
@@ -307,7 +339,7 @@ exports.respondToDeleteRequest = async (req, res) => {
         totalMembers: team.members.length
       });
     } else {
-      // If ANY member rejects, cancel the delete request
+      // if ANY member rejects, cancel the delete request
       team.deleteRequest = undefined;
       await team.save();
       res.json({ success: true, cancelled: true });

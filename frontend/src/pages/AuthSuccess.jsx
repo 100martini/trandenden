@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { setToken } from '../utils/auth';
-import '../styles/Dashboard.css';
 
 const AuthSuccess = () => {
   const navigate = useNavigate();
@@ -12,21 +11,13 @@ const AuthSuccess = () => {
     
     if (token) {
       setToken(token);
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } else {
-      navigate('/login?error=no_token');
+      navigate('/login?error=no_token', { replace: true });
     }
   }, [searchParams, navigate]);
 
-  return (
-    <div className="loading-container">
-      <div className="loading-card">
-        <div className="loading-spinner"></div>
-        <h2>Fetching data from 42 API</h2>
-        <p>Please wait</p>
-      </div>
-    </div>
-  );
+  return null;
 };
 
 export default AuthSuccess;

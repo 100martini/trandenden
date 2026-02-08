@@ -1389,3 +1389,20 @@
     grid-template-columns: 1fr;
   }
 }
+.team-card.pending-acceptance {
+  opacity: 0.8;
+  pointer-events: none;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.team-card.pending-acceptance:hover {
+  transform: none;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.pending-badge.acceptance {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}

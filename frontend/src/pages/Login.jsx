@@ -10,7 +10,8 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
+      return;
     }
 
     const errorParam = searchParams.get('error');
@@ -34,6 +35,9 @@ const Login = () => {
   const handleOAuthLogin = () => {
     window.location.href = 'http://localhost:3000/api/auth/42';
   };
+
+  if (isAuthenticated())
+    return null;
 
   return (
     <div className="login-page">

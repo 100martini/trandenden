@@ -9,12 +9,10 @@ import '../styles/Dashboard.css';
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(() => {
-    // Try to load cached user data
     const cached = sessionStorage.getItem('user');
     return cached ? JSON.parse(cached) : null;
   });
   const [loading, setLoading] = useState(() => {
-    // Only show loading if we don't have cached data
     const cached = sessionStorage.getItem('user');
     return !cached;
   });
@@ -35,7 +33,6 @@ const Dashboard = () => {
       setUser(response.data);
       sessionStorage.setItem('user', JSON.stringify(response.data));
       
-      // Only show loading screen if we don't have cached data
       if (!hasCachedData) {
         const elapsed = Date.now() - startTime;
         const minLoadingTime = 1500;
