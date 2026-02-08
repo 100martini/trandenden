@@ -1,4 +1,4 @@
-# Trandenden - 42 Project Hub
+# Trandenden - 21 Project Hub
 
 A project management and collaboration platform for 42 Network students, integrating with the 42 Intra API for curriculum tracking, team management, and project organization.
 
