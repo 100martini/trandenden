@@ -250,7 +250,3 @@ PATCH /api/teams/delete-requests/:requestId/respond     - Approve/reject deletio
 ```
 
 ---
-
-## License
-
-This project is part of the 42 Network curriculum.
