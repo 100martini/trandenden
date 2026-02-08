@@ -8,8 +8,16 @@ import '../styles/Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    // Try to load cached user data
+    const cached = sessionStorage.getItem('user');
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [loading, setLoading] = useState(() => {
+    // Only show loading if we don't have cached data
+    const cached = sessionStorage.getItem('user');
+    return !cached;
+  });
   const [showWelcome, setShowWelcome] = useState(() => {
     return !sessionStorage.getItem('welcomeShown');
   });
@@ -19,6 +27,7 @@ const Dashboard = () => {
   }, []);
 
   const fetchUser = async () => {
+    const hasCachedData = sessionStorage.getItem('user');
     const startTime = Date.now();
     
     try {
@@ -26,11 +35,15 @@ const Dashboard = () => {
       setUser(response.data);
       sessionStorage.setItem('user', JSON.stringify(response.data));
       
-      const elapsed = Date.now() - startTime;
-      const minLoadingTime = 1500;
-      const remaining = Math.max(0, minLoadingTime - elapsed);
+      // Only show loading screen if we don't have cached data
+      if (!hasCachedData) {
+        const elapsed = Date.now() - startTime;
+        const minLoadingTime = 1500;
+        const remaining = Math.max(0, minLoadingTime - elapsed);
+        
+        await new Promise(resolve => setTimeout(resolve, remaining));
+      }
       
-      await new Promise(resolve => setTimeout(resolve, remaining));
       setLoading(false);
       
     } catch (err) {
