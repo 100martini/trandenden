@@ -26,7 +26,6 @@ const Dashboard = () => {
       setUser(response.data);
       sessionStorage.setItem('user', JSON.stringify(response.data));
       
-      // Ensure loading shows for at least 1.5 seconds
       const elapsed = Date.now() - startTime;
       const minLoadingTime = 1500;
       const remaining = Math.max(0, minLoadingTime - elapsed);

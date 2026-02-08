@@ -185,7 +185,6 @@ exports.requestDeleteTeam = async (req, res) => {
       return res.json({ deleted: true });
     }
 
-    // Check if there's already a pending delete request
     if (team.deleteRequest && team.deleteRequest.requestedBy) {
       return res.status(400).json({ error: 'Delete request already pending' });
     }
@@ -217,7 +216,6 @@ exports.getDeleteRequests = async (req, res) => {
     const currentUser = await User.findById(req.userId);
     const userId = currentUser.intraId;
 
-    // Query only teams with a valid deleteRequest
     const teams = await Team.find({
       'members.id': userId,
       'deleteRequest.requestedBy': { $exists: true, $ne: null, $type: 'number' },
@@ -227,12 +225,10 @@ exports.getDeleteRequests = async (req, res) => {
     const requests = [];
     
     for (const team of teams) {
-      // Skip if requester is current user
       if (Number(team.deleteRequest.requestedBy) === Number(userId)) {
         continue;
       }
       
-      // Skip if missing required data
       if (!team.deleteRequest.requestedByLogin || !team.deleteRequest.teamName) {
         continue;
       }
@@ -274,7 +270,6 @@ exports.respondToDeleteRequest = async (req, res) => {
     }
 
     if (accept) {
-      // Add to approvals if not already there (use Number for comparison)
       const alreadyApproved = team.deleteRequest.approvals.some(
         id => Number(id) === Number(userId)
       );
@@ -283,12 +278,10 @@ exports.respondToDeleteRequest = async (req, res) => {
         team.deleteRequest.approvals.push(userId);
       }
 
-      // Remove from rejections if was there
       team.deleteRequest.rejections = team.deleteRequest.rejections.filter(
         id => Number(id) !== Number(userId)
       );
 
-      // Check if ALL members have approved (compare as Numbers)
       const allApproved = team.members.every(member => 
         team.deleteRequest.approvals.some(
           approvalId => Number(approvalId) === Number(member.id)

@@ -352,7 +352,7 @@ const FullDashboard = ({ user }) => {
       }
       const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
       if (pendingTeam) {
-        return; // Don't allow creating new team if one is pending
+        return;
       }
       setSelectedProject(project);
       setShowCreateTeam(true);

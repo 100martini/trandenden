@@ -35,7 +35,7 @@ const teamSchema = new mongoose.Schema({
     inProgress: [{ type: mongoose.Schema.Types.Mixed }],
     review: [{ type: mongoose.Schema.Types.Mixed }],
     done: [{ type: mongoose.Schema.Types.Mixed }]
-  },   // <-- IMPORTANT: comma here
+  },
 
   // ADD THIS FIELD TO backend/src/models/team.model.js
   deleteRequest: {
