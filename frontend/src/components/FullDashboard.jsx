@@ -682,7 +682,7 @@ const FullDashboard = ({ user }) => {
                     </div>
                     <div className="project-name">{project.name}</div>
                     <div className="project-meta">
-                      {project.team > 1 ? `Team (${project.team})` : 'Solo'}
+                      {project.team > 1 ? `Team` : 'Solo'}
                     </div>
                   </div>
                 );
