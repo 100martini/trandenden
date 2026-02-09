@@ -13,8 +13,8 @@ services:
       - ./backend:/app
       - /app/node_modules
     depends_on:
-      - mongodb
-      - mariadb
+      postgres:
+        condition: service_healthy
     networks:
       - transcendence-net
 
@@ -34,30 +34,23 @@ services:
     networks:
       - transcendence-net
 
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "5432:5432"
     environment:
-      - MONGO_INITDB_DATABASE=transcendence
+      - POSTGRES_USER=transcendence
+      - POSTGRES_PASSWORD=transcendence_password
+      - POSTGRES_DB=transcendence
     volumes:
-      - mongodb_data:/data/db
-    networks:
-      - transcendence-net
-
-  mariadb:
-    image: mariadb:latest
-    container_name: mariadb
-    restart: unless-stopped
-    ports:
-      - "3306:3306"
-    environment:
-      - MARIADB_ROOT_PASSWORD=root_password
-      - MARIADB_DATABASE=transcendence
-    volumes:
-      - mariadb_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transcendence"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - transcendence-net
 
@@ -66,5 +59,4 @@ networks:
     driver: bridge
 
 volumes:
-  mongodb_data:
-  mariadb_data:
+  postgres_data:

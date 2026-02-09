@@ -2,104 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { removeToken, getToken } from '../utils/auth';
 import '../styles/FullDashboard.css';
+import '../styles/Congrats.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-const OLD_CURRICULUM = {
-  0: [{ slug: 'libft', name: 'Libft', team: 1 }],
-  1: [
-    { slug: 'get_next_line', name: 'get_next_line', team: 1 },
-    { slug: 'ft_printf', name: 'ft_printf', team: 1 },
-    { slug: 'born2beroot', name: 'Born2beroot', team: 1 }
-  ],
-  2: [
-    { slug: 'push_swap', name: 'push_swap', team: 1 },
-    { slug: 'pipex', name: 'pipex', team: 1, alt: 'minitalk' },
-    { slug: 'minitalk', name: 'minitalk', team: 1, alt: 'pipex' },
-    { slug: 'fract-ol', name: 'fract-ol', team: 1, alt: 'fdf' },
-    { slug: 'fdf', name: 'FdF', team: 1, alt: 'fract-ol' },
-    { slug: 'so_long', name: 'so_long', team: 1, alt: 'fract-ol' }
-  ],
-  3: [
-    { slug: 'philosophers', name: 'Philosophers', team: 1 },
-    { slug: 'minishell', name: 'minishell', team: 2, maxTeam: 2 }
-  ],
-  4: [
-    { slug: 'cub3d', name: 'cub3D', team: 2, maxTeam: 2, alt: 'minirt' },
-    { slug: 'minirt', name: 'miniRT', team: 2, maxTeam: 2, alt: 'cub3d' },
-    { slug: 'netpractice', name: 'NetPractice', team: 1 },
-    { slug: 'cpp-module-00', name: 'CPP Module 00', team: 1 },
-    { slug: 'cpp-module-01', name: 'CPP Module 01', team: 1 },
-    { slug: 'cpp-module-02', name: 'CPP Module 02', team: 1 },
-    { slug: 'cpp-module-03', name: 'CPP Module 03', team: 1 },
-    { slug: 'cpp-module-04', name: 'CPP Module 04', team: 1 }
-  ],
-  5: [
-    { slug: 'webserv', name: 'webserv', team: 2, maxTeam: 3 },
-    { slug: 'ft_irc', name: 'ft_irc', team: 2, maxTeam: 3, alt: 'webserv' },
-    { slug: 'cpp-module-05', name: 'CPP Module 05', team: 1 },
-    { slug: 'cpp-module-06', name: 'CPP Module 06', team: 1 },
-    { slug: 'cpp-module-07', name: 'CPP Module 07', team: 1 },
-    { slug: 'cpp-module-08', name: 'CPP Module 08', team: 1 },
-    { slug: 'cpp-module-09', name: 'CPP Module 09', team: 1 },
-    { slug: 'inception', name: 'Inception', team: 1 }
-  ],
-  6: [
-    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 4, maxTeam: 5 },
-    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2, maxTeam: 2 }
-  ]
-};
-
-const NEW_CURRICULUM = {
-  0: [{ slug: 'libft', name: 'Libft', team: 1 }],
-  1: [
-    { slug: 'get_next_line', name: 'get_next_line', team: 1 },
-    { slug: 'ft_printf', name: 'ft_printf', team: 1 },
-    { slug: 'push_swap', name: 'push_swap', team: 1 }
-  ],
-  2: [
-    { slug: 'born2beroot', name: 'Born2beroot', team: 1 },
-    { slug: 'python-module-00', name: 'Python Module 00', team: 1 },
-    { slug: 'python-module-01', name: 'Python Module 01', team: 1 },
-    { slug: 'python-module-02', name: 'Python Module 02', team: 1 },
-    { slug: 'python-module-03', name: 'Python Module 03', team: 1 },
-    { slug: 'python-module-04', name: 'Python Module 04', team: 1 },
-    { slug: 'python-module-05', name: 'Python Module 05', team: 1 },
-    { slug: 'python-module-06', name: 'Python Module 06', team: 1 },
-    { slug: 'python-module-07', name: 'Python Module 07', team: 1 },
-    { slug: 'python-module-08', name: 'Python Module 08', team: 1 },
-    { slug: 'python-module-09', name: 'Python Module 09', team: 1 },
-    { slug: 'python-module-10', name: 'Python Module 10', team: 1 },
-    { slug: 'a-maze-ing', name: 'A-Maze-ing', team: 2, maxTeam: 2 }
-  ],
-  3: [
-    { slug: 'codexion', name: 'Codexion', team: 1 },
-    { slug: 'fly-in', name: 'Fly-in', team: 1 },
-    { slug: 'call-me-maybe', name: 'Call Me Maybe', team: 1 }
-  ],
-  4: [
-    { slug: 'netpractice', name: 'NetPractice', team: 1 },
-    { slug: 'pac-man', name: 'Pac-Man', team: 2, maxTeam: 2 },
-    { slug: 'rag-against-the-machine', name: 'RAG against the machine', team: 1 }
-  ],
-  5: [
-    { slug: 'agent-smith', name: 'Agent Smith', team: 2, maxTeam: 3 },
-    { slug: 'the-answer-protocol', name: 'The Answer Protocol', team: 2, maxTeam: 3 },
-    { slug: 'inception', name: 'Inception', team: 1 }
-  ],
-  6: [
-    { slug: 'ft_transcendence', name: 'ft_transcendence', team: 4, maxTeam: 5 },
-    { slug: '42_collaborative_resume', name: '42 Collaborative Resume', team: 2, maxTeam: 2 }
-  ]
-};
-
-const COMMON_CIRCLE_01 = {
-  0: [{ slug: 'libft', name: 'Libft', team: 1 }],
-  1: [
-    { slug: 'get_next_line', name: 'get_next_line', team: 1 },
-    { slug: 'ft_printf', name: 'ft_printf', team: 1 }
-  ]
-};
 
 const FullDashboard = ({ user }) => {
   const navigate = useNavigate();
@@ -118,8 +23,30 @@ const FullDashboard = ({ user }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState(null);
   const [deleteRequests, setDeleteRequests] = useState([]);
+  const [allProjects, setAllProjects] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+
+  const username = user?.login || 'user';
+  const currentUserId = user?.intraId || user?.id;
+  const campus = user?.campus || 'Campus';
+  const wallet = user?.wallet || 0;
+  const correctionPoints = user?.correctionPoints || user?.correction_point || 0;
+  const level = user?.level || user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level || 0;
+  const avatarUrl = user?.image?.link || user?.image?.versions?.medium || user?.avatar?.medium;
+  const userProjects = user?.projectsUsers || [];
+  const currentCircle = user?.currentCircle ?? 0;
+  const curriculum = user?.curriculum || 'unknown';
+
+  const grade = useMemo(() => {
+    const cursus42 = user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus' || c.cursus_id === 21);
+    return cursus42?.grade || 'Cadet';
+  }, [user]);
+
+  const isCadet = grade === 'Cadet';
+  const isTranscender = grade === 'Transcender' || grade === 'Member';
 
   useEffect(() => {
+    fetchProjects();
     fetchMyTeams();
     fetchPendingInvites();
     fetchDeleteRequests();
@@ -132,6 +59,20 @@ const FullDashboard = ({ user }) => {
 
     return () => clearInterval(interval);
   }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch(`${API_URL}/projects`);
+      if (response.ok) {
+        const data = await response.json();
+        setAllProjects(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects');
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
 
   const fetchMyTeams = async () => {
     try {
@@ -193,7 +134,14 @@ const FullDashboard = ({ user }) => {
     setSearching(true);
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/auth/users/search?q=${encodeURIComponent(query)}`, {
+      const params = new URLSearchParams({
+        q: query,
+        curriculum: curriculum
+      });
+      if (selectedProject?.slug) {
+        params.append('projectSlug', selectedProject.slug);
+      }
+      const response = await fetch(`${API_URL}/auth/users/search?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -202,7 +150,7 @@ const FullDashboard = ({ user }) => {
       setSearchResults([]);
     }
     setSearching(false);
-  }, []);
+  }, [curriculum, selectedProject]);
 
   const handleSearchChange = (e) => {
     const query = e.target.value;
@@ -211,7 +159,7 @@ const FullDashboard = ({ user }) => {
   };
 
   const addMember = (member) => {
-    const maxMembers = (selectedProject?.maxTeam || selectedProject?.team || 2) - 1;
+    const maxMembers = (selectedProject?.maxTeam || selectedProject?.minTeam || 2) - 1;
     if (selectedMembers.length >= maxMembers) {
       return;
     }
@@ -233,38 +181,37 @@ const FullDashboard = ({ user }) => {
     setSelectedMembers([]);
   };
 
-  const minMembers = (selectedProject?.team || 2) - 1;
-  const maxMembers = (selectedProject?.maxTeam || selectedProject?.team || 2) - 1;
+  const minMembers = (selectedProject?.minTeam || 2) - 1;
+  const maxMembers = (selectedProject?.maxTeam || selectedProject?.minTeam || 2) - 1;
   const canCreateTeam = teamName.trim() !== '' && selectedMembers.length >= minMembers;
 
-  const username = user?.login || 'user';
-  const currentUserId = user?.intraId || user?.id;
-  const campus = user?.campus || 'Campus';
-  const wallet = user?.wallet || 0;
-  const correctionPoints = user?.correctionPoints || user?.correction_point || 0;
-  const level = user?.level || user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level || 0;
-  const avatarUrl = user?.image?.link || user?.image?.versions?.medium || user?.avatar?.medium;
-  const allProjects = user?.projectsUsers || [];
-  const currentCircle = user?.currentCircle ?? 0;
-  const curriculum = user?.curriculum || 'unknown';
-
-  const grade = useMemo(() => {
-    const cursus42 = user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus' || c.cursus_id === 21);
-    return cursus42?.grade || 'Cadet';
-  }, [user]);
-
-  const isCadet = grade === 'Cadet';
-  const isTranscender = grade === 'Transcender' || grade === 'Member';
-
-  const getCurriculum = useMemo(() => {
-    if (curriculum === 'old') return OLD_CURRICULUM;
-    if (curriculum === 'new') return NEW_CURRICULUM;
-    return COMMON_CIRCLE_01;
-  }, [curriculum]);
+  const getCurriculumProjects = useMemo(() => {
+    if (projectsLoading || allProjects.length === 0) return {};
+    
+    const projectsByCircle = {};
+    const userCurriculum = curriculum === 'unknown' ? 'old' : curriculum;
+    
+    allProjects.forEach(project => {
+      if (project.curricula.includes(userCurriculum)) {
+        if (!projectsByCircle[project.circle]) {
+          projectsByCircle[project.circle] = [];
+        }
+        projectsByCircle[project.circle].push({
+          slug: project.slug,
+          name: project.name,
+          team: project.minTeam,
+          minTeam: project.minTeam,
+          maxTeam: project.maxTeam
+        });
+      }
+    });
+    
+    return projectsByCircle;
+  }, [allProjects, curriculum, projectsLoading]);
 
   const getUserProjectStatus = useCallback((projectSlug) => {
     const normalizedSlug = projectSlug.toLowerCase().replace(/_/g, '-');
-    const project = allProjects.find(p => {
+    const project = userProjects.find(p => {
       const pSlug = (p.project?.slug || '').toLowerCase().replace(/_/g, '-');
       return pSlug.includes(normalizedSlug) || normalizedSlug.includes(pSlug);
     });
@@ -275,18 +222,17 @@ const FullDashboard = ({ user }) => {
       finalMark: project.final_mark,
       id: project.id
     };
-  }, [allProjects]);
+  }, [userProjects]);
 
   const getCircleProjects = useCallback((circleNum) => {
-    const circleDefinition = getCurriculum[circleNum] || [];
+    const circleDefinition = getCurriculumProjects[circleNum] || [];
     return circleDefinition.map(proj => ({
       ...proj,
       userStatus: getUserProjectStatus(proj.slug)
     }));
-  }, [getCurriculum, getUserProjectStatus]);
+  }, [getCurriculumProjects, getUserProjectStatus]);
 
   const needsCurriculumDetection = curriculum === 'unknown' && currentCircle >= 1;
-
   const activeCircle = selectedCircle !== null ? selectedCircle : currentCircle;
 
   const circleProjects = useMemo(() => {
@@ -303,29 +249,35 @@ const FullDashboard = ({ user }) => {
   }, [getCircleProjects]);
 
   const allCCProjects = useMemo(() => {
-    if (!isTranscender) return [];
+    if (!isTranscender || projectsLoading) return [];
     const projects = [];
-    const curr = curriculum === 'new' ? NEW_CURRICULUM : OLD_CURRICULUM;
-    for (let i = 0; i <= 6; i++) {
-      const circleProjs = curr[i] || [];
-      circleProjs.forEach(proj => {
-        const userStatus = getUserProjectStatus(proj.slug);
+    const userCurriculum = curriculum === 'unknown' ? 'old' : curriculum;
+    
+    allProjects.forEach(project => {
+      if (project.curricula.includes(userCurriculum) && !project.isOuterCore) {
+        const userStatus = getUserProjectStatus(project.slug);
         if (userStatus) {
-          projects.push({ ...proj, circle: i, userStatus });
+          projects.push({
+            slug: project.slug,
+            name: project.name,
+            team: project.minTeam,
+            minTeam: project.minTeam,
+            maxTeam: project.maxTeam,
+            circle: project.circle,
+            userStatus
+          });
         }
-      });
-    }
+      }
+    });
+    
     return projects;
-  }, [isTranscender, curriculum, getUserProjectStatus]);
+  }, [isTranscender, allProjects, curriculum, getUserProjectStatus, projectsLoading]);
 
   const outerCoreProjects = useMemo(() => {
     if (!isTranscender) return [];
-    const ccSlugs = new Set();
-    const curr = curriculum === 'new' ? NEW_CURRICULUM : OLD_CURRICULUM;
-    for (let i = 0; i <= 6; i++) {
-      (curr[i] || []).forEach(p => ccSlugs.add(p.slug.toLowerCase()));
-    }
-    return allProjects.filter(p => {
+    const ccSlugs = new Set(allProjects.filter(p => !p.isOuterCore).map(p => p.slug.toLowerCase()));
+    
+    return userProjects.filter(p => {
       const slug = (p.project?.slug || '').toLowerCase();
       const isCC = Array.from(ccSlugs).some(cc => slug.includes(cc) || cc.includes(slug));
       const is42Cursus = p.cursus_ids?.includes(21);
@@ -334,6 +286,8 @@ const FullDashboard = ({ user }) => {
       slug: p.project?.slug,
       name: p.project?.name,
       team: 1,
+      minTeam: 1,
+      maxTeam: 1,
       userStatus: {
         status: p.status,
         validated: p['validated?'],
@@ -341,10 +295,10 @@ const FullDashboard = ({ user }) => {
         id: p.id
       }
     }));
-  }, [isTranscender, curriculum, allProjects]);
+  }, [isTranscender, allProjects, userProjects]);
 
   const handleProjectClick = (project) => {
-    if (project.team > 1) {
+    if (project.team > 1 || project.minTeam > 1) {
       const existingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'active');
       if (existingTeam) {
         navigate(`/kanban/${project.slug}`);
@@ -375,7 +329,6 @@ const FullDashboard = ({ user }) => {
         body: JSON.stringify({
           name: teamName,
           projectSlug: selectedProject.slug,
-          projectName: selectedProject.name,
           memberIds: selectedMembers.map(m => m.id)
         })
       });
@@ -505,11 +458,11 @@ const FullDashboard = ({ user }) => {
     deleteRequests.filter(req => req.requestedBy?.login && req.teamName),
   [deleteRequests]);
 
-  const totalActive = allProjects.filter(p => 
+  const totalActive = userProjects.filter(p => 
     p.status === 'in_progress' || p.status === 'searching_a_group'
   ).length;
   
-  const totalCompleted = allProjects.filter(p => 
+  const totalCompleted = userProjects.filter(p => 
     p.status === 'finished' && p['validated?']
   ).length;
 
@@ -521,6 +474,14 @@ const FullDashboard = ({ user }) => {
   const randomTitle = useMemo(() => 
     titles[Math.floor(Math.random() * titles.length)], 
   []);
+
+  if (projectsLoading) {
+    return (
+      <div className="full-dashboard">
+        <div className="loading">Loading projects...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="full-dashboard">
@@ -619,6 +580,20 @@ const FullDashboard = ({ user }) => {
           </div>
         </div>
 
+        {isTranscender && (
+          <div className="cc-congrats-section">
+            <div className="congrats-card">
+              <div className="congrats-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+              </div>
+              <h2>Congratulations, {grade}!</h2>
+              <p>You've completed the Common Core. Welcome to the next level of your 42 journey.</p>
+            </div>
+          </div>
+        )}
+
         {isCadet && (
           <>
             <div className="section-header">
@@ -682,7 +657,7 @@ const FullDashboard = ({ user }) => {
                     </div>
                     <div className="project-name">{project.name}</div>
                     <div className="project-meta">
-                      {project.team > 1 ? `Team` : 'Solo'}
+                      {project.team > 1 || project.minTeam > 1 ? `Team` : 'Solo'}
                     </div>
                   </div>
                 );
@@ -722,11 +697,11 @@ const FullDashboard = ({ user }) => {
                       <div className="team-header">
                         <div className="team-avatars">
                           {team.members.slice(0, 3).map((member, idx) => (
-                            member.avatar ? (
-                              <img key={idx} src={member.avatar} alt={member.login} className="team-header-avatar" title={member.login} />
+                            member.avatar || member.user?.avatar ? (
+                              <img key={idx} src={member.avatar || member.user.avatar} alt={member.login || member.user.login} className="team-header-avatar" title={member.login || member.user.login} />
                             ) : (
-                              <div key={idx} className="team-header-placeholder" title={member.login}>
-                                {member.login.slice(0, 2).toUpperCase()}
+                              <div key={idx} className="team-header-placeholder" title={member.login || member.user.login}>
+                                {(member.login || member.user.login).slice(0, 2).toUpperCase()}
                               </div>
                             )
                           ))}
@@ -859,7 +834,7 @@ const FullDashboard = ({ user }) => {
             </div>
             <div className="modal-body">
               <p><strong>{selectedProject.name}</strong></p>
-              <p>Team size: {selectedProject.team}{selectedProject.maxTeam && selectedProject.maxTeam !== selectedProject.team ? `-${selectedProject.maxTeam}` : ''} members (you + {minMembers}{maxMembers !== minMembers ? `-${maxMembers}` : ''} others)</p>
+              <p>Team size: {selectedProject.minTeam}{selectedProject.maxTeam && selectedProject.maxTeam !== selectedProject.minTeam ? `-${selectedProject.maxTeam}` : ''} members (you + {minMembers}{maxMembers !== minMembers ? `-${maxMembers}` : ''} others)</p>
               
               <div className="team-form">
                 <input 

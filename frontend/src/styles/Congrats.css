@@ -1,0 +1,44 @@
+.cc-congrats-section {
+  padding: 40px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.congrats-card {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.05));
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+  padding: 60px 40px;
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+}
+
+.congrats-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.congrats-icon svg {
+  color: #22c55e;
+  filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.3));
+}
+
+.congrats-card h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #22c55e;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+
+.congrats-card p {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+  max-width: 400px;
+  margin: 0 auto;
+}

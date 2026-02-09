@@ -1,45 +1,35 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./config/db.config');
-const authRoutes = require('./routes/auth.routes');
-const teamRoutes = require('./routes/team.routes');
+const { PrismaClient } = require('@prisma/client');
 
 const app = express();
+const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  const timestamp = new Date().toISOString();
+  console.log(`${timestamp} - ${req.method} ${req.path}`);
   next();
 });
 
+const authRoutes = require('./routes/auth.routes');
+const teamRoutes = require('./routes/team.routes');
+const projectRoutes = require('./routes/project.routes');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/teams', teamRoutes);
-
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'ft_transcendence API',
-    version: '1.0.0',
-    endpoints: {
-      auth: '/api/auth',
-      health: '/health'
-    }
-  });
-});
+app.use('/api/projects', projectRoutes);
 
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+  res.json({ status: 'OK', database: 'PostgreSQL' });
 });
 
 app.use((req, res) => {
@@ -47,23 +37,33 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('Server error:', err.stack);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error('Error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
-connectDB()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, closing server...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, closing server...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`
 Server is running!
 Port: ${PORT}
 Environment: ${process.env.NODE_ENV || 'development'}
 API: http://localhost:${PORT}
 Auth: http://localhost:${PORT}/api/auth
-      `);
-    });
-  })
-  .catch(err => {
-    console.error('Failed to start server:', err);
-    process.exit(1);
-  });
+  `);
+});
+
+module.exports = { prisma };
