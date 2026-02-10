@@ -24,9 +24,11 @@ model User {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  createdTeams     Team[]        @relation("TeamCreator")
+  createdTeams     Team[]            @relation("TeamCreator")
   teamMemberships  TeamMember[]
   userProjects     UserProject[]
+  deleteRequests   DeleteRequest[]
+  deleteApprovals  DeleteApproval[]
 
   @@index([intraId])
   @@index([login])
@@ -84,9 +86,10 @@ model Team {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  creator User    @relation("TeamCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-  members TeamMember[]
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator       User           @relation("TeamCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  members       TeamMember[]
+  deleteRequest DeleteRequest?
 
   @@index([projectId])
   @@index([creatorId])
@@ -126,4 +129,36 @@ model UserProject {
   @@unique([userId, projectId])
   @@index([userId])
   @@index([projectId])
+}
+
+model DeleteRequest {
+  id          Int       @id @default(autoincrement())
+  teamId      Int       @unique
+  requesterId Int
+  status      String    @default("pending")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  team      Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  requester User             @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  approvals DeleteApproval[]
+
+  @@index([teamId])
+  @@index([requesterId])
+  @@index([status])
+}
+
+model DeleteApproval {
+  id              Int       @id @default(autoincrement())
+  deleteRequestId Int
+  userId          Int
+  approved        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  deleteRequest DeleteRequest @relation(fields: [deleteRequestId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([deleteRequestId, userId])
+  @@index([deleteRequestId])
+  @@index([userId])
 }

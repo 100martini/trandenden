@@ -275,27 +275,51 @@ const FullDashboard = ({ user }) => {
 
   const outerCoreProjects = useMemo(() => {
     if (!isTranscender) return [];
+    
+    const dbOuterCoreProjects = allProjects
+      .filter(p => p.isOuterCore)
+      .map(p => ({
+        slug: p.slug,
+        name: p.name,
+        team: p.minTeam,
+        minTeam: p.minTeam,
+        maxTeam: p.maxTeam,
+        userStatus: getUserProjectStatus(p.slug)
+      }))
+      .filter(p => p.userStatus);
+
     const ccSlugs = new Set(allProjects.filter(p => !p.isOuterCore).map(p => p.slug.toLowerCase()));
     
-    return userProjects.filter(p => {
-      const slug = (p.project?.slug || '').toLowerCase();
-      const isCC = Array.from(ccSlugs).some(cc => slug.includes(cc) || cc.includes(slug));
-      const is42Cursus = p.cursus_ids?.includes(21);
-      return is42Cursus && !isCC;
-    }).map(p => ({
-      slug: p.project?.slug,
-      name: p.project?.name,
-      team: 1,
-      minTeam: 1,
-      maxTeam: 1,
-      userStatus: {
-        status: p.status,
-        validated: p['validated?'],
-        finalMark: p.final_mark,
-        id: p.id
+    const intraOuterCore = userProjects
+      .filter(p => {
+        const slug = (p.project?.slug || '').toLowerCase();
+        const isCC = Array.from(ccSlugs).some(cc => slug.includes(cc) || cc.includes(slug));
+        const is42Cursus = p.cursus_ids?.includes(21);
+        return is42Cursus && !isCC;
+      })
+      .map(p => ({
+        slug: p.project?.slug,
+        name: p.project?.name,
+        team: 1,
+        minTeam: 1,
+        maxTeam: 1,
+        userStatus: {
+          status: p.status,
+          validated: p['validated?'],
+          finalMark: p.final_mark,
+          id: p.id
+        }
+      }));
+
+    const allOC = [...dbOuterCoreProjects];
+    intraOuterCore.forEach(intraProject => {
+      if (!allOC.find(p => p.slug?.toLowerCase() === intraProject.slug?.toLowerCase())) {
+        allOC.push(intraProject);
       }
-    }));
-  }, [isTranscender, allProjects, userProjects]);
+    });
+
+    return allOC;
+  }, [isTranscender, allProjects, userProjects, getUserProjectStatus]);
 
   const handleProjectClick = (project) => {
     if (project.team > 1 || project.minTeam > 1) {
@@ -315,34 +339,54 @@ const FullDashboard = ({ user }) => {
     }
   };
 
-  const handleTeamCreated = async () => {
-    if (!canCreateTeam) return;
-    
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_URL}/teams`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: teamName,
-          projectSlug: selectedProject.slug,
-          memberIds: selectedMembers.map(m => m.id)
-        })
-      });
+const [isCreatingTeam, setIsCreatingTeam] = useState(false);
+const [teamError, setTeamError] = useState(null);
 
-      if (response.ok) {
-        await fetchMyTeams();
-        await fetchPendingInvites();
-        setShowCreateTeam(false);
-        resetTeamModal();
-      }
-    } catch (err) {
-      console.error('Failed to create team');
+const handleTeamCreated = async () => {
+  if (!canCreateTeam) return;
+  
+  setIsCreatingTeam(true);
+  setTeamError(null);
+  
+  try {
+    const token = getToken();
+    console.log('Creating team with:', {
+      name: teamName,
+      projectSlug: selectedProject.slug,
+      memberIds: selectedMembers.map(m => m.id)
+    });
+    
+    const response = await fetch(`${API_URL}/teams`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: teamName,
+        projectSlug: selectedProject.slug,
+        memberIds: selectedMembers.map(m => m.id)
+      })
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create team');
     }
-  };
+
+    console.log('Team created successfully:', data);
+    await fetchMyTeams();
+    await fetchPendingInvites();
+    setShowCreateTeam(false);
+    resetTeamModal();
+  } catch (err) {
+    console.error('Failed to create team:', err);
+    setTeamError(err.message || 'Failed to create team');
+  } finally {
+    setIsCreatingTeam(false);
+  }
+};
 
   const handleInviteResponse = async (team, accept) => {
     try {
@@ -581,20 +625,6 @@ const FullDashboard = ({ user }) => {
           </div>
         </div>
 
-        {isTranscender && (
-          <div className="cc-congrats-section">
-            <div className="congrats-card">
-              <div className="congrats-icon">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              </div>
-              <h2>Congratulations, {grade}!</h2>
-              <p>You've completed the Common Core. Welcome to the next level of your 42 journey.</p>
-            </div>
-          </div>
-        )}
-
         {isCadet && (
           <>
             <div className="section-header">
@@ -664,71 +694,71 @@ const FullDashboard = ({ user }) => {
                 );
               })}
             </div>
-
-            <div className="section-header">
-              <h2>My Teams</h2>
-            </div>
-
-            {myTeams.filter(t => t.status === 'approved' || t.isPending).length === 0 ? (
-              <div className="empty-teams">
-                <p>No active teams yet. Create a team by clicking on a team project above.</p>
-              </div>
-            ) : (
-              <div className="teams-grid">
-                {myTeams.filter(t => t.status === 'approved' || t.isPending).map(team => {
-                  const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy);
-                  const isPendingAcceptance = team.isPending && !isPendingDelete;
-                  
-                  return (
-                    <div 
-                      key={team._id || team.id} 
-                      className={`team-card ${isPendingDelete ? 'pending-delete' : ''} ${isPendingAcceptance ? 'pending-acceptance' : ''}`}
-                      onClick={() => !isPendingDelete && !isPendingAcceptance && goToTeamKanban(team)}
-                    >
-                      {isPendingDelete && (
-                        <div className="pending-badge">
-                          Delete requested by @{team.deleteRequest.requestedByLogin}
-                        </div>
-                      )}
-                      {isPendingAcceptance && (
-                        <div className="pending-badge acceptance">
-                          {team.acceptanceCount}/{team.totalMembers} accepted
-                        </div>
-                      )}
-                      <div className="team-header">
-                        <div className="team-avatars">
-                          {team.members.slice(0, 3).map((member, idx) => (
-                            member.avatar || member.user?.avatar ? (
-                              <img key={idx} src={member.avatar || member.user.avatar} alt={member.login || member.user.login} className="team-header-avatar" title={member.login || member.user.login} />
-                            ) : (
-                              <div key={idx} className="team-header-placeholder" title={member.login || member.user.login}>
-                                {(member.login || member.user.login).slice(0, 2).toUpperCase()}
-                              </div>
-                            )
-                          ))}
-                        </div>
-                        <div className="team-info">
-                          <div className="team-name">{team.name}</div>
-                          <div className="team-project">{team.project.name}</div>
-                        </div>
-                        {!isPendingDelete && !isPendingAcceptance && (
-                          <button 
-                            className="team-delete" 
-                            onClick={(e) => handleDeleteTeam(team, e)}
-                            title="Request team deletion"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/>
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </>
+        )}
+
+        <div className="section-header">
+          <h2>My Teams</h2>
+        </div>
+
+        {myTeams.filter(t => t.status === 'approved' || t.isPending).length === 0 ? (
+          <div className="empty-teams">
+            <p>No active teams yet. Create a team by clicking on a team project above.</p>
+          </div>
+        ) : (
+          <div className="teams-grid">
+            {myTeams.filter(t => t.status === 'approved' || t.isPending).map(team => {
+              const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy);
+              const isPendingAcceptance = team.isPending && !isPendingDelete;
+              
+              return (
+                <div 
+                  key={team._id || team.id} 
+                  className={`team-card ${isPendingDelete ? 'pending-delete' : ''} ${isPendingAcceptance ? 'pending-acceptance' : ''}`}
+                  onClick={() => !isPendingDelete && !isPendingAcceptance && goToTeamKanban(team)}
+                >
+                  {isPendingDelete && (
+                    <div className="pending-badge">
+                      Delete requested by @{team.deleteRequest.requestedByLogin}
+                    </div>
+                  )}
+                  {isPendingAcceptance && (
+                    <div className="pending-badge acceptance">
+                      {team.acceptanceCount}/{team.totalMembers} accepted
+                    </div>
+                  )}
+                  <div className="team-header">
+                    <div className="team-avatars">
+                      {team.members.slice(0, 3).map((member, idx) => (
+                        member.avatar || member.user?.avatar ? (
+                          <img key={idx} src={member.avatar || member.user.avatar} alt={member.login || member.user.login} className="team-header-avatar" title={member.login || member.user.login} />
+                        ) : (
+                          <div key={idx} className="team-header-placeholder" title={member.login || member.user.login}>
+                            {(member.login || member.user.login).slice(0, 2).toUpperCase()}
+                          </div>
+                        )
+                      ))}
+                    </div>
+                    <div className="team-info">
+                      <div className="team-name">{team.name}</div>
+                      <div className="team-project">{team.project.name}</div>
+                    </div>
+                    {!isPendingDelete && !isPendingAcceptance && (
+                      <button 
+                        className="team-delete" 
+                        onClick={(e) => handleDeleteTeam(team, e)}
+                        title="Request team deletion"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6M14 11v6"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {isTranscender && (
@@ -756,31 +786,34 @@ const FullDashboard = ({ user }) => {
 
             {activeSection === 'cc' && (
               <>
-                <div className="section-header">
-                  <h2>Common Core - Completed</h2>
-                </div>
-                <div className="projects-grid">
-                  {allCCProjects.map((project, idx) => {
-                    const badge = getStatusBadge(project.userStatus);
-                    return (
-                      <div 
-                        key={idx} 
-                        className="project-card"
-                        onClick={() => handleProjectClick(project)}
-                      >
-                        <div className="project-header">
-                          <div className="project-icon">
-                            {project.name.substring(0, 2).toUpperCase()}
-                          </div>
-                          <span className={`project-badge ${badge.className}`}>
-                            {badge.text}
-                          </span>
-                        </div>
-                        <div className="project-name">{project.name}</div>
-                        <div className="project-meta">Circle {project.circle}</div>
+                <div className="cc-congrats-section">
+                  <div className="congrats-card">
+                    <div className="congrats-icon">
+                      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                        <line x1="9" y1="9" x2="9.01" y2="9"/>
+                        <line x1="15" y1="9" x2="15.01" y2="9"/>
+                      </svg>
+                    </div>
+                    <h2>Congratulations, {username}!</h2>
+                    <p className="congrats-main">you survived being a slave to the Black Hole.</p>
+                    <p className="congrats-sub">The Common Core couldn't break you. Now go touch some grass before diving into the Outer Core... or don't, we're not your parents.</p>
+                    <div className="congrats-stats">
+                      <div className="congrats-stat">
+                        <span className="stat-number">∞</span>
+                        <span className="stat-label">Debugging Hours</span>
                       </div>
-                    );
-                  })}
+                      <div className="congrats-stat">
+                        <span className="stat-number">42</span>
+                        <span className="stat-label">Coffees Consumed</span>
+                      </div>
+                      <div className="congrats-stat">
+                        <span className="stat-number">{totalCompleted}</span>
+                        <span className="stat-label">Projects Conquered</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
