@@ -124,17 +124,43 @@ const teamController = {
             { creatorId: req.userId, status: 'pending' }
           ]
         },
-        include: { members: { include: { user: true } }, project: true, creator: true },
+        include: {
+          members: { include: { user: true } },
+          project: true,
+          creator: true,
+          deleteRequest: {
+            include: {
+              requester: { select: { id: true, login: true } },
+              approvals: true
+            }
+          }
+        },
         orderBy: { createdAt: 'desc' }
       });
 
       const formattedTeams = teams.map(team => {
-        const formatted = { ...team };
+        const formatted = {
+          ...team,
+          deleteRequest: null
+        };
+
         if (team.status === 'pending') {
           formatted.acceptanceCount = team.members.filter(m => m.status === 'approved').length;
           formatted.totalMembers = team.members.length;
           formatted.isPending = true;
         }
+
+        if (team.deleteRequest && team.deleteRequest.status === 'pending') {
+          formatted.deleteRequest = {
+            id: team.deleteRequest.id,
+            requestedBy: team.deleteRequest.requester,
+            requestedByLogin: team.deleteRequest.requester.login,
+            approvalCount: team.deleteRequest.approvals.filter(a => a.approved).length,
+            totalMembers: team.members.length,
+            teamName: team.name
+          };
+        }
+
         return formatted;
       });
 
@@ -149,17 +175,26 @@ const teamController = {
     try {
       const { teamId } = req.params;
 
-      const team = await prisma.team.findUnique({ where: { id: parseInt(teamId) } });
+      const team = await prisma.team.findUnique({
+        where: { id: parseInt(teamId) },
+        include: { members: true }
+      });
+
       if (!team) {
         return res.status(404).json({ error: 'Team not found' });
       }
 
-      if (team.creatorId !== req.userId) {
-        return res.status(403).json({ error: 'Only creator can delete team' });
+      const isMember = team.members.some(m => m.userId === req.userId);
+      if (!isMember) {
+        return res.status(403).json({ error: 'Not a team member' });
       }
 
-      await prisma.team.delete({ where: { id: parseInt(teamId) } });
-      res.json({ deleted: true });
+      if (team.members.length === 1 || (team.status === 'pending' && team.creatorId === req.userId)) {
+        await prisma.team.delete({ where: { id: parseInt(teamId) } });
+        return res.json({ deleted: true });
+      }
+
+      return res.status(400).json({ error: 'Use delete request for approved teams with multiple members' });
     } catch (error) {
       console.error('Delete team error:', error);
       res.status(500).json({ error: 'Failed to delete team' });
@@ -168,24 +203,188 @@ const teamController = {
 
   async requestDeleteTeam(req, res) {
     try {
-      res.json({ message: 'Delete request feature not yet implemented' });
+      const { teamId } = req.params;
+
+      const team = await prisma.team.findUnique({
+        where: { id: parseInt(teamId) },
+        include: {
+          members: true,
+          deleteRequest: { where: { status: 'pending' } }
+        }
+      });
+
+      if (!team) {
+        return res.status(404).json({ error: 'Team not found' });
+      }
+
+      const isMember = team.members.some(m => m.userId === req.userId);
+      if (!isMember) {
+        return res.status(403).json({ error: 'Not a team member' });
+      }
+
+      if (team.deleteRequest) {
+        return res.status(400).json({ error: 'Delete request already pending' });
+      }
+
+      const deleteRequest = await prisma.deleteRequest.create({
+        data: {
+          teamId: parseInt(teamId),
+          requesterId: req.userId,
+          status: 'pending',
+          approvals: {
+            create: {
+              userId: req.userId,
+              approved: true
+            }
+          }
+        },
+        include: {
+          requester: { select: { id: true, login: true } },
+          approvals: true
+        }
+      });
+
+      if (team.members.length === 1) {
+        await prisma.team.delete({ where: { id: parseInt(teamId) } });
+        return res.json({ deleted: true });
+      }
+
+      const approvedCount = 1;
+      if (approvedCount >= team.members.length) {
+        await prisma.team.delete({ where: { id: parseInt(teamId) } });
+        return res.json({ deleted: true });
+      }
+
+      res.json({
+        id: deleteRequest.id,
+        teamId: parseInt(teamId),
+        requestedBy: deleteRequest.requester,
+        approvalCount: 1,
+        totalMembers: team.members.length,
+        status: 'pending'
+      });
     } catch (error) {
+      console.error('Request delete team error:', error);
       res.status(500).json({ error: 'Failed to request deletion' });
     }
   },
 
   async getDeleteRequests(req, res) {
     try {
-      res.json([]);
+      const deleteRequests = await prisma.deleteRequest.findMany({
+        where: {
+          status: 'pending',
+          requesterId: { not: req.userId },
+          team: {
+            members: { some: { userId: req.userId } }
+          }
+        },
+        include: {
+          team: {
+            include: {
+              project: true,
+              members: true
+            }
+          },
+          requester: { select: { id: true, login: true } },
+          approvals: true
+        }
+      });
+
+      // Filter out requests the user already responded to
+      const pendingForUser = deleteRequests.filter(dr =>
+        !dr.approvals.some(a => a.userId === req.userId)
+      );
+
+      const formatted = pendingForUser.map(dr => ({
+        id: dr.id,
+        teamId: dr.teamId,
+        teamName: dr.team.name,
+        project: { name: dr.team.project.name, slug: dr.team.project.slug },
+        requestedBy: dr.requester,
+        approvalCount: dr.approvals.filter(a => a.approved).length,
+        totalMembers: dr.team.members.length,
+        status: dr.status
+      }));
+
+      res.json(formatted);
     } catch (error) {
+      console.error('Get delete requests error:', error);
       res.status(500).json({ error: 'Failed to fetch delete requests' });
     }
   },
 
   async respondToDeleteRequest(req, res) {
     try {
-      res.json({ success: true });
+      const { requestId } = req.params;
+      const { accept } = req.body;
+
+      const deleteRequest = await prisma.deleteRequest.findUnique({
+        where: { id: parseInt(requestId) },
+        include: {
+          team: { include: { members: true } },
+          approvals: true
+        }
+      });
+
+      if (!deleteRequest) {
+        return res.status(404).json({ error: 'Delete request not found' });
+      }
+
+      if (deleteRequest.status !== 'pending') {
+        return res.status(400).json({ error: 'Delete request is no longer pending' });
+      }
+
+      const isMember = deleteRequest.team.members.some(m => m.userId === req.userId);
+      if (!isMember) {
+        return res.status(403).json({ error: 'Not a team member' });
+      }
+
+      const alreadyResponded = deleteRequest.approvals.some(a => a.userId === req.userId);
+      if (alreadyResponded) {
+        return res.status(400).json({ error: 'Already responded to this request' });
+      }
+
+      if (accept) {
+        await prisma.deleteApproval.create({
+          data: {
+            deleteRequestId: parseInt(requestId),
+            userId: req.userId,
+            approved: true
+          }
+        });
+
+        const updatedRequest = await prisma.deleteRequest.findUnique({
+          where: { id: parseInt(requestId) },
+          include: {
+            team: { include: { members: true } },
+            approvals: true
+          }
+        });
+
+        const approvedCount = updatedRequest.approvals.filter(a => a.approved).length;
+        const totalMembers = updatedRequest.team.members.length;
+
+        if (approvedCount >= totalMembers) {
+          await prisma.team.delete({ where: { id: deleteRequest.teamId } });
+          return res.json({ deleted: true, message: 'All members approved. Team deleted.' });
+        }
+
+        res.json({
+          success: true,
+          approvalCount: approvedCount,
+          totalMembers: totalMembers
+        });
+      } else {
+        await prisma.deleteRequest.update({
+          where: { id: parseInt(requestId) },
+          data: { status: 'rejected' }
+        });
+
+        res.json({ rejected: true, message: 'Delete request rejected' });
+      }
     } catch (error) {
+      console.error('Respond to delete request error:', error);
       res.status(500).json({ error: 'Failed to respond to delete request' });
     }
   }
