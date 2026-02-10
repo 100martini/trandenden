@@ -32,7 +32,7 @@ const FullDashboard = ({ user }) => {
   const wallet = user?.wallet || 0;
   const correctionPoints = user?.correctionPoints || user?.correction_point || 0;
   const level = user?.level || user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level || 0;
-  const avatarUrl = user?.image?.link || user?.image?.versions?.medium || user?.avatar?.medium;
+  const avatarUrl = user?.avatar || user?.image?.link || user?.image?.versions?.medium;
   const userProjects = user?.projectsUsers || [];
   const currentCircle = user?.currentCircle ?? 0;
   const curriculum = user?.curriculum || 'unknown';
@@ -299,7 +299,7 @@ const FullDashboard = ({ user }) => {
 
   const handleProjectClick = (project) => {
     if (project.team > 1 || project.minTeam > 1) {
-      const existingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'active');
+      const existingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
       if (existingTeam) {
         navigate(`/kanban/${project.slug}`);
         return;
@@ -380,22 +380,20 @@ const FullDashboard = ({ user }) => {
       const token = getToken();
       const teamId = teamToDelete._id || teamToDelete.id;
       
-      const response = await fetch(`${API_URL}/teams/${teamId}/request-delete`, {
-        method: 'POST',
+      const response = await fetch(`${API_URL}/teams/${teamId}`, {
+        method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`
         }
       });
 
       if (response.ok) {
         await fetchMyTeams();
-        await fetchDeleteRequests();
         setShowDeleteConfirm(false);
         setTeamToDelete(null);
       }
     } catch (err) {
-      console.error('Failed to request team deletion');
+      console.error('Failed to delete team');
     }
   };
 
@@ -668,13 +666,13 @@ const FullDashboard = ({ user }) => {
               <h2>My Teams</h2>
             </div>
 
-            {myTeams.filter(t => t.status === 'active' || t.isPending).length === 0 ? (
+            {myTeams.filter(t => t.status === 'approved' || t.isPending).length === 0 ? (
               <div className="empty-teams">
                 <p>No active teams yet. Create a team by clicking on a team project above.</p>
               </div>
             ) : (
               <div className="teams-grid">
-                {myTeams.filter(t => t.status === 'active' || t.isPending).map(team => {
+                {myTeams.filter(t => t.status === 'approved' || t.isPending).map(team => {
                   const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy && team.deleteRequest.requestedByLogin);
                   const isPendingAcceptance = team.isPending && !isPendingDelete;
                   

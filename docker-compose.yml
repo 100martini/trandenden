@@ -9,6 +9,7 @@ services:
       - "3000:3000"
     env_file:
       - ./backend/.env
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run dev"
     volumes:
       - ./backend:/app
       - /app/node_modules

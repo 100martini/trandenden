@@ -32,11 +32,35 @@ const authController = {
 
       const userData = userResponse.data;
 
-      const questsResponse = await axios.get(`https://api.intra.42.fr/v2/users/${userData.id}/quests_users`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
+      const validatedSlugs = (userData.projects_users || [])
+        .filter(p => p['validated?'] === true)
+        .map(p => p.project?.slug)
+        .filter(Boolean);
+
+      const allSlugs = (userData.projects_users || [])
+        .map(p => p.project?.slug)
+        .filter(Boolean);
+
+      const matchedValidated = await prisma.project.findMany({
+        where: { slug: { in: validatedSlugs } }
       });
-      const quests = questsResponse.data || [];
-      const currentCircle = quests.filter(q => q.validated === true).length;
+
+      const matchedAll = await prisma.project.findMany({
+        where: { slug: { in: allSlugs } }
+      });
+
+      const highestValidatedCircle = matchedValidated.length > 0
+        ? Math.max(...matchedValidated.map(p => p.circle))
+        : 0;
+
+      const highestRegisteredCircle = matchedAll.length > 0
+        ? Math.max(...matchedAll.map(p => p.circle))
+        : 0;
+
+      const currentCircle = Math.max(
+        highestRegisteredCircle,
+        Math.min(highestValidatedCircle + 1, 6)
+      );
 
       const projectSlugs = (userData.projects_users || []).map(p => p.project?.slug).filter(Boolean);
       const hasPythonProjects = projectSlugs.some(slug => slug.includes('python-module'));
