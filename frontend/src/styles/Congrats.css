@@ -20,7 +20,6 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, #4ade80, transparent);
 }
 
 .congrats-icon {
@@ -77,12 +76,6 @@
   border-radius: 12px;
   border: 1px solid rgba(74, 222, 128, 0.1);
   transition: all 0.3s ease;
-}
-
-.congrats-stat:hover {
-  background: rgba(74, 222, 128, 0.08);
-  border-color: rgba(74, 222, 128, 0.2);
-  transform: translateY(-2px);
 }
 
 .stat-number {
