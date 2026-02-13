@@ -193,7 +193,6 @@ const FullDashboard = ({ user }) => {
     const userCurriculum = curriculum === 'unknown' ? 'old' : curriculum;
     
     allProjects.forEach(project => {
-      // Only show common core (non-outer-core) projects in milestones
       if (project.isOuterCore) return;
       if (project.curricula.includes(userCurriculum)) {
         if (!projectsByCircle[project.circle]) {

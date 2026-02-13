@@ -10,7 +10,6 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated() ? children : <Navigate to="/login" />;
 };
 
-// Component to handle OAuth callback
 const TokenHandler = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,12 +20,9 @@ const TokenHandler = ({ children }) => {
     const error = params.get('error');
 
     if (token) {
-      // Save the token
       setToken(token);
-      // Redirect to dashboard
       navigate('/dashboard', { replace: true });
     } else if (error) {
-      // Handle error - redirect to login with error message
       console.error('OAuth error:', error);
       navigate('/login', { replace: true });
     }
