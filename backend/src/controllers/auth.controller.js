@@ -103,17 +103,58 @@ const authController = {
       const userProjects = userData.projects_users || [];
       for (const projectUser of userProjects) {
         if (!projectUser.project?.slug) continue;
-        const project = await prisma.project.findUnique({ where: { slug: projectUser.project.slug } });
+
+        const is42Cursus = projectUser.cursus_ids?.includes(21);
+        if (!is42Cursus) continue;
+
+        let project = await prisma.project.findUnique({
+          where: { slug: projectUser.project.slug }
+        });
+
+        if (!project) {
+          try {
+            project = await prisma.project.create({
+              data: {
+                slug: projectUser.project.slug,
+                name: projectUser.project.name || projectUser.project.slug,
+                circle: 0,
+                minTeam: 1,
+                maxTeam: 1,
+                isOuterCore: true
+              }
+            });
+            console.log(`Created outer core project: ${project.slug}`);
+          } catch (err) {
+            project = await prisma.project.findUnique({
+              where: { slug: projectUser.project.slug }
+            });
+          }
+        }
+
         if (project) {
           await prisma.userProject.upsert({
             where: { userId_projectId: { userId: user.id, projectId: project.id } },
-            update: { status: projectUser.status, validated: projectUser['validated?'] || false, finalMark: projectUser.final_mark },
-            create: { userId: user.id, projectId: project.id, status: projectUser.status, validated: projectUser['validated?'] || false, finalMark: projectUser.final_mark }
+            update: {
+              status: projectUser.status,
+              validated: projectUser['validated?'] || false,
+              finalMark: projectUser.final_mark
+            },
+            create: {
+              userId: user.id,
+              projectId: project.id,
+              status: projectUser.status,
+              validated: projectUser['validated?'] || false,
+              finalMark: projectUser.final_mark
+            }
           });
         }
       }
 
-      const token = jwt.sign({ userId: user.id, intraId: user.intraId, login: user.login }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign(
+        { userId: user.id, intraId: user.intraId, login: user.login },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
       res.redirect(`${process.env.FRONTEND_URL}?token=${token}`);
     } catch (error) {
       console.error('OAuth error:', error.response?.data || error.message);
@@ -125,7 +166,13 @@ const authController = {
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.userId },
-        include: { userProjects: { include: { project: true } } }
+        include: {
+          userProjects: {
+            include: {
+              project: true
+            }
+          }
+        }
       });
 
       if (!user) {
@@ -147,7 +194,11 @@ const authController = {
         grade: user.grade,
         currentCircle: user.currentCircle,
         projectsUsers: user.userProjects.map(up => ({
-          project: { slug: up.project.slug, name: up.project.name },
+          project: {
+            slug: up.project.slug,
+            name: up.project.name,
+            isOuterCore: up.project.isOuterCore
+          },
           status: up.status,
           'validated?': up.validated,
           final_mark: up.finalMark
@@ -161,7 +212,7 @@ const authController = {
 
   async searchUsers(req, res) {
     try {
-      const { q, projectSlug, curriculum } = req.query;
+      const { q, projectSlug, curriculum, grade } = req.query;
 
       if (!q || q.length < 2) {
         return res.json([]);
@@ -172,20 +223,42 @@ const authController = {
         id: { not: req.userId }
       };
 
-      if (curriculum && projectSlug !== 'ft_transcendence') {
-        where.curriculum = curriculum;
+      if (projectSlug === 'ft_transcendence') {
+      } else {
+        if (curriculum) {
+          where.curriculum = curriculum;
+        }
+        if (grade) {
+          if (grade === 'Cadet') {
+            where.grade = 'Cadet';
+          } else {
+            where.grade = { not: 'Cadet' };
+          }
+        }
       }
 
       let users = await prisma.user.findMany({
         where,
-        select: { id: true, intraId: true, login: true, displayName: true, avatar: true, campus: true, level: true, userProjects: { include: { project: true } } },
+        select: {
+          id: true,
+          intraId: true,
+          login: true,
+          displayName: true,
+          avatar: true,
+          campus: true,
+          level: true,
+          grade: true,
+          userProjects: { include: { project: true } }
+        },
         take: 50
       });
 
       if (projectSlug && projectSlug !== 'ft_transcendence') {
         const project = await prisma.project.findUnique({ where: { slug: projectSlug } });
         if (project && project.isOuterCore) {
-          users = users.filter(user => user.userProjects.some(up => up.project.slug === projectSlug));
+          users = users.filter(user =>
+            user.userProjects.some(up => up.project.slug === projectSlug)
+          );
         }
       }
 
@@ -196,7 +269,8 @@ const authController = {
         displayName: u.displayName,
         avatar: u.avatar,
         campus: u.campus,
-        level: u.level
+        level: u.level,
+        grade: u.grade
       })));
     } catch (error) {
       console.error('Error searching users:', error);

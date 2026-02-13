@@ -205,11 +205,12 @@ const teamController = {
     try {
       const { teamId } = req.params;
 
+      // NO where on deleteRequest — it's a one-to-one relation
       const team = await prisma.team.findUnique({
         where: { id: parseInt(teamId) },
         include: {
           members: true,
-          deleteRequest: { where: { status: 'pending' } }
+          deleteRequest: true
         }
       });
 
@@ -222,8 +223,12 @@ const teamController = {
         return res.status(403).json({ error: 'Not a team member' });
       }
 
-      if (team.deleteRequest) {
+      if (team.deleteRequest && team.deleteRequest.status === 'pending') {
         return res.status(400).json({ error: 'Delete request already pending' });
+      }
+
+      if (team.deleteRequest) {
+        await prisma.deleteRequest.delete({ where: { id: team.deleteRequest.id } });
       }
 
       const deleteRequest = await prisma.deleteRequest.create({
@@ -245,12 +250,6 @@ const teamController = {
       });
 
       if (team.members.length === 1) {
-        await prisma.team.delete({ where: { id: parseInt(teamId) } });
-        return res.json({ deleted: true });
-      }
-
-      const approvedCount = 1;
-      if (approvedCount >= team.members.length) {
         await prisma.team.delete({ where: { id: parseInt(teamId) } });
         return res.json({ deleted: true });
       }
@@ -291,7 +290,6 @@ const teamController = {
         }
       });
 
-      // Filter out requests the user already responded to
       const pendingForUser = deleteRequests.filter(dr =>
         !dr.approvals.some(a => a.userId === req.userId)
       );

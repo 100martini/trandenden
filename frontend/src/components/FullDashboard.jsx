@@ -136,7 +136,8 @@ const FullDashboard = ({ user }) => {
       const token = getToken();
       const params = new URLSearchParams({
         q: query,
-        curriculum: curriculum
+        curriculum: curriculum,
+        grade: grade
       });
       if (selectedProject?.slug) {
         params.append('projectSlug', selectedProject.slug);
@@ -150,7 +151,7 @@ const FullDashboard = ({ user }) => {
       setSearchResults([]);
     }
     setSearching(false);
-  }, [curriculum, selectedProject]);
+  }, [curriculum, grade, selectedProject]);
 
   const handleSearchChange = (e) => {
     const query = e.target.value;
@@ -192,6 +193,8 @@ const FullDashboard = ({ user }) => {
     const userCurriculum = curriculum === 'unknown' ? 'old' : curriculum;
     
     allProjects.forEach(project => {
+      // Only show common core (non-outer-core) projects in milestones
+      if (project.isOuterCore) return;
       if (project.curricula.includes(userCurriculum)) {
         if (!projectsByCircle[project.circle]) {
           projectsByCircle[project.circle] = [];
@@ -276,6 +279,7 @@ const FullDashboard = ({ user }) => {
   const outerCoreProjects = useMemo(() => {
     if (!isTranscender) return [];
     
+    // Get outer core projects from the DB (auto-created during login)
     const dbOuterCoreProjects = allProjects
       .filter(p => p.isOuterCore)
       .map(p => ({
@@ -288,18 +292,12 @@ const FullDashboard = ({ user }) => {
       }))
       .filter(p => p.userStatus);
 
-    const ccSlugs = new Set(allProjects.filter(p => !p.isOuterCore).map(p => p.slug.toLowerCase()));
-    
-    const intraOuterCore = userProjects
-      .filter(p => {
-        const slug = (p.project?.slug || '').toLowerCase();
-        const isCC = Array.from(ccSlugs).some(cc => slug.includes(cc) || cc.includes(slug));
-        const is42Cursus = p.cursus_ids?.includes(21);
-        return is42Cursus && !isCC;
-      })
+    // Also check user's projects from /me that have isOuterCore flag
+    const userOCProjects = userProjects
+      .filter(p => p.project?.isOuterCore)
       .map(p => ({
-        slug: p.project?.slug,
-        name: p.project?.name,
+        slug: p.project.slug,
+        name: p.project.name,
         team: 1,
         minTeam: 1,
         maxTeam: 1,
@@ -311,10 +309,11 @@ const FullDashboard = ({ user }) => {
         }
       }));
 
+    // Merge without duplicates
     const allOC = [...dbOuterCoreProjects];
-    intraOuterCore.forEach(intraProject => {
-      if (!allOC.find(p => p.slug?.toLowerCase() === intraProject.slug?.toLowerCase())) {
-        allOC.push(intraProject);
+    userOCProjects.forEach(uProject => {
+      if (!allOC.find(p => p.slug?.toLowerCase() === uProject.slug?.toLowerCase())) {
+        allOC.push(uProject);
       }
     });
 
@@ -339,54 +338,54 @@ const FullDashboard = ({ user }) => {
     }
   };
 
-const [isCreatingTeam, setIsCreatingTeam] = useState(false);
-const [teamError, setTeamError] = useState(null);
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
+  const [teamError, setTeamError] = useState(null);
 
-const handleTeamCreated = async () => {
-  if (!canCreateTeam) return;
-  
-  setIsCreatingTeam(true);
-  setTeamError(null);
-  
-  try {
-    const token = getToken();
-    console.log('Creating team with:', {
-      name: teamName,
-      projectSlug: selectedProject.slug,
-      memberIds: selectedMembers.map(m => m.id)
-    });
+  const handleTeamCreated = async () => {
+    if (!canCreateTeam) return;
     
-    const response = await fetch(`${API_URL}/teams`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+    setIsCreatingTeam(true);
+    setTeamError(null);
+    
+    try {
+      const token = getToken();
+      console.log('Creating team with:', {
         name: teamName,
         projectSlug: selectedProject.slug,
         memberIds: selectedMembers.map(m => m.id)
-      })
-    });
+      });
+      
+      const response = await fetch(`${API_URL}/teams`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: teamName,
+          projectSlug: selectedProject.slug,
+          memberIds: selectedMembers.map(m => m.id)
+        })
+      });
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to create team');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create team');
+      }
+
+      console.log('Team created successfully:', data);
+      await fetchMyTeams();
+      await fetchPendingInvites();
+      setShowCreateTeam(false);
+      resetTeamModal();
+    } catch (err) {
+      console.error('Failed to create team:', err);
+      setTeamError(err.message || 'Failed to create team');
+    } finally {
+      setIsCreatingTeam(false);
     }
-
-    console.log('Team created successfully:', data);
-    await fetchMyTeams();
-    await fetchPendingInvites();
-    setShowCreateTeam(false);
-    resetTeamModal();
-  } catch (err) {
-    console.error('Failed to create team:', err);
-    setTeamError(err.message || 'Failed to create team');
-  } finally {
-    setIsCreatingTeam(false);
-  }
-};
+  };
 
   const handleInviteResponse = async (team, accept) => {
     try {
@@ -827,18 +826,22 @@ const handleTeamCreated = async () => {
                   <div className="projects-grid">
                     {outerCoreProjects.map((project, idx) => {
                       const badge = getStatusBadge(project.userStatus);
+                      const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
+                      const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+                      const hasPendingTeam = !!pendingTeam;
+                      
                       return (
                         <div 
                           key={idx} 
-                          className="project-card"
-                          onClick={() => handleProjectClick(project)}
+                          className={`project-card ${activeTeam ? 'has-team' : ''} ${hasPendingTeam ? 'pending-team' : ''}`}
+                          onClick={() => !activeTeam && !hasPendingTeam && handleProjectClick(project)}
                         >
                           <div className="project-header">
                             <div className="project-icon">
                               {project.name.substring(0, 2).toUpperCase()}
                             </div>
-                            <span className={`project-badge ${badge.className}`}>
-                              {badge.text}
+                            <span className={`project-badge ${activeTeam ? 'badge-completed' : hasPendingTeam ? 'badge-pending' : badge.className}`}>
+                              {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : badge.text}
                             </span>
                           </div>
                           <div className="project-name">{project.name}</div>
