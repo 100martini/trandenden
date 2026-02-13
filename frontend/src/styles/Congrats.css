@@ -73,7 +73,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  background: rgba(74, 222, 128, 0.05);
+  background: #1a1721;
   border-radius: 12px;
   border: 1px solid rgba(74, 222, 128, 0.1);
   transition: all 0.3s ease;

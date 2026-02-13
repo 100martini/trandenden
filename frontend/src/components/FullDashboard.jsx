@@ -11,7 +11,7 @@ const FullDashboard = ({ user }) => {
   const [selectedCircle, setSelectedCircle] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showCreateTeam, setShowCreateTeam] = useState(false);
-  const [activeSection, setActiveSection] = useState('cc');
+  const [activeSection, setActiveSection] = useState('oc');
   const [teamName, setTeamName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -276,12 +276,20 @@ const FullDashboard = ({ user }) => {
     return projects;
   }, [isTranscender, allProjects, curriculum, getUserProjectStatus, projectsLoading]);
 
+  const isExcludedOC = (slug) => {
+    const s = slug.toLowerCase();
+    return (
+      s.includes('exam-rank') ||
+      s.includes('work-experience') ||
+      s.startsWith('42cursus-')
+    );
+  };
+
   const outerCoreProjects = useMemo(() => {
     if (!isTranscender) return [];
-    
-    // Get outer core projects from the DB (auto-created during login)
+
     const dbOuterCoreProjects = allProjects
-      .filter(p => p.isOuterCore)
+      .filter(p => p.isOuterCore && !isExcludedOC(p.slug))
       .map(p => ({
         slug: p.slug,
         name: p.name,
@@ -292,9 +300,8 @@ const FullDashboard = ({ user }) => {
       }))
       .filter(p => p.userStatus);
 
-    // Also check user's projects from /me that have isOuterCore flag
     const userOCProjects = userProjects
-      .filter(p => p.project?.isOuterCore)
+      .filter(p => p.project?.isOuterCore && !isExcludedOC(p.project.slug))
       .map(p => ({
         slug: p.project.slug,
         name: p.project.name,
@@ -309,7 +316,6 @@ const FullDashboard = ({ user }) => {
         }
       }));
 
-    // Merge without duplicates
     const allOC = [...dbOuterCoreProjects];
     userOCProjects.forEach(uProject => {
       if (!allOC.find(p => p.slug?.toLowerCase() === uProject.slug?.toLowerCase())) {
