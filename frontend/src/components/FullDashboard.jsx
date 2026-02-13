@@ -801,7 +801,7 @@ const FullDashboard = ({ user }) => {
                         <line x1="15" y1="9" x2="15.01" y2="9"/>
                       </svg>
                     </div>
-                    <h2>Congratulations, {username}!</h2>
+                    <h2>Congratulations {username}</h2>
                     <p className="congrats-main">you survived being a slave to the Black Hole.</p>
                     <p className="congrats-sub">The Common Core couldn't break you. Now go touch some grass before diving into the Outer Core... or don't, we're not your parents.</p>
                     <div className="congrats-stats">
