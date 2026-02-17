@@ -14,6 +14,29 @@ const teamController = {
         return res.status(404).json({ error: 'Project not found' });
       }
 
+      const creatorTeam = await prisma.team.findFirst({
+        where: {
+          projectId: project.id,
+          members: { some: { userId: req.userId } }
+        }
+      });
+      if (creatorTeam) {
+        return res.status(400).json({ error: 'You already have a team for this project' });
+      }
+
+      for (const memberId of memberIds) {
+        const memberTeam = await prisma.team.findFirst({
+          where: {
+            projectId: project.id,
+            members: { some: { userId: parseInt(memberId) } }
+          }
+        });
+        if (memberTeam) {
+          const memberUser = await prisma.user.findUnique({ where: { id: parseInt(memberId) } });
+          return res.status(400).json({ error: `${memberUser?.login || 'A member'} already has a team for this project` });
+        }
+      }
+
       const team = await prisma.team.create({
         data: {
           name,
@@ -41,18 +64,23 @@ const teamController = {
     try {
       const teams = await prisma.team.findMany({
         where: {
-          members: { some: { userId: req.userId, status: 'pending' } },
+          status: 'pending',
+          members: { some: { userId: req.userId } },
           creatorId: { not: req.userId }
         },
         include: { members: { include: { user: true } }, project: true, creator: true },
         orderBy: { createdAt: 'desc' }
       });
 
-      const formattedTeams = teams.map(team => ({
-        ...team,
-        acceptanceCount: team.members.filter(m => m.status === 'approved').length,
-        totalMembers: team.members.length
-      }));
+      const formattedTeams = teams.map(team => {
+        const myMember = team.members.find(m => m.userId === req.userId);
+        return {
+          ...team,
+          acceptanceCount: team.members.filter(m => m.status === 'approved').length,
+          totalMembers: team.members.length,
+          myStatus: myMember?.status || 'pending'
+        };
+      });
 
       res.json(formattedTeams);
     } catch (error) {
@@ -121,7 +149,7 @@ const teamController = {
         where: {
           OR: [
             { members: { some: { userId: req.userId } }, status: 'approved' },
-            { creatorId: req.userId, status: 'pending' }
+            { members: { some: { userId: req.userId, status: 'approved' } }, status: 'pending' }
           ]
         },
         include: {
@@ -205,7 +233,6 @@ const teamController = {
     try {
       const { teamId } = req.params;
 
-      // NO where on deleteRequest — it's a one-to-one relation
       const team = await prisma.team.findUnique({
         where: { id: parseInt(teamId) },
         include: {
@@ -290,20 +317,20 @@ const teamController = {
         }
       });
 
-      const pendingForUser = deleteRequests.filter(dr =>
-        !dr.approvals.some(a => a.userId === req.userId)
-      );
-
-      const formatted = pendingForUser.map(dr => ({
-        id: dr.id,
-        teamId: dr.teamId,
-        teamName: dr.team.name,
-        project: { name: dr.team.project.name, slug: dr.team.project.slug },
-        requestedBy: dr.requester,
-        approvalCount: dr.approvals.filter(a => a.approved).length,
-        totalMembers: dr.team.members.length,
-        status: dr.status
-      }));
+      const formatted = deleteRequests.map(dr => {
+        const myApproval = dr.approvals.find(a => a.userId === req.userId);
+        return {
+          id: dr.id,
+          teamId: dr.teamId,
+          teamName: dr.team.name,
+          project: { name: dr.team.project.name, slug: dr.team.project.slug },
+          requestedBy: dr.requester,
+          approvalCount: dr.approvals.filter(a => a.approved).length,
+          totalMembers: dr.team.members.length,
+          status: dr.status,
+          myStatus: myApproval ? (myApproval.approved ? 'approved' : 'rejected') : 'pending'
+        };
+      });
 
       res.json(formatted);
     } catch (error) {

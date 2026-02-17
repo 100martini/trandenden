@@ -1406,3 +1406,28 @@
   color: #60a5fa;
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
+
+.response-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.response-badge.accepted {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.response-badge.declined {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.invite-item.responded {
+  opacity: 0.75;
+}

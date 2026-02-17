@@ -332,7 +332,8 @@ const FullDashboard = ({ user }) => {
         navigate(`/kanban/${project.slug}`);
         return;
       }
-      const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+      const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending')
+  || pendingInvites.find(t => t.project.slug === project.slug);
       if (pendingTeam) {
         return;
       }
@@ -354,11 +355,6 @@ const FullDashboard = ({ user }) => {
     
     try {
       const token = getToken();
-      console.log('Creating team with:', {
-        name: teamName,
-        projectSlug: selectedProject.slug,
-        memberIds: selectedMembers.map(m => m.id)
-      });
       
       const response = await fetch(`${API_URL}/teams`, {
         method: 'POST',
@@ -379,7 +375,6 @@ const FullDashboard = ({ user }) => {
         throw new Error(data.error || 'Failed to create team');
       }
 
-      console.log('Team created successfully:', data);
       await fetchMyTeams();
       await fetchPendingInvites();
       setShowCreateTeam(false);
@@ -437,7 +432,6 @@ const FullDashboard = ({ user }) => {
       });
 
       if (response.ok) {
-        const data = await response.json();
         await fetchMyTeams();
         await fetchDeleteRequests();
         setShowDeleteConfirm(false);
@@ -507,6 +501,11 @@ const FullDashboard = ({ user }) => {
     deleteRequests.filter(req => req.requestedBy?.login && req.teamName),
   [deleteRequests]);
 
+  const actionableInvitesCount = pendingInvites.filter(i => i.myStatus === 'pending').length;
+  const actionableDeleteCount = validDeleteRequests.filter(r => r.myStatus === 'pending').length;
+  const totalRequestsCount = pendingInvites.length + validDeleteRequests.length;
+  const actionableCount = actionableInvitesCount + actionableDeleteCount;
+
   const totalActive = userProjects.filter(p => 
     p.status === 'in_progress' || p.status === 'searching_a_group'
   ).length;
@@ -542,10 +541,10 @@ const FullDashboard = ({ user }) => {
 
         <nav className="nav-section">
           <a href="#" className="nav-item active">Dashboard</a>
-          {(pendingInvites.length > 0 || validDeleteRequests.length > 0) && (
+          {totalRequestsCount > 0 && (
             <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); setShowInvites(true); }}>
               Requests
-              <span className="badge">{pendingInvites.length + validDeleteRequests.length}</span>
+              <span className="badge">{actionableCount > 0 ? actionableCount : totalRequestsCount}</span>
             </a>
           )}
         </nav>
@@ -673,7 +672,8 @@ const FullDashboard = ({ user }) => {
               {circleProjects.map((project, idx) => {
                 const badge = getStatusBadge(project.userStatus);
                 const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
-                const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+                const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending')
+  || pendingInvites.find(t => t.project.slug === project.slug);
                 const hasPendingTeam = !!pendingTeam;
                 
                 return (
@@ -705,14 +705,12 @@ const FullDashboard = ({ user }) => {
           <h2>My Teams</h2>
         </div>
 
-        {myTeams.filter(t => t.status === 'approved' || t.isPending).length === 0 ? (
-          <div className="empty-teams">
+        {myTeams.filter(t => t.status === 'approved' || t.isPending).length === 0 ? (          <div className="empty-teams">
             <p>No active teams yet. Create a team by clicking on a team project above.</p>
           </div>
         ) : (
           <div className="teams-grid">
-            {myTeams.filter(t => t.status === 'approved' || t.isPending).map(team => {
-              const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy);
+    {myTeams.filter(t => t.status === 'approved' || t.isPending).map(team => {              const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy);
               const isPendingAcceptance = team.isPending && !isPendingDelete;
               
               return (
@@ -832,7 +830,8 @@ const FullDashboard = ({ user }) => {
                     {outerCoreProjects.map((project, idx) => {
                       const badge = getStatusBadge(project.userStatus);
                       const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
-                      const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+                      const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending')
+  || pendingInvites.find(t => t.project.slug === project.slug);
                       const hasPendingTeam = !!pendingTeam;
                       
                       return (
@@ -991,31 +990,40 @@ const FullDashboard = ({ user }) => {
                     <>
                       <h3 className="requests-section-title">Team Invitations</h3>
                       <div className="invites-list">
-                        {pendingInvites.map(invite => (
-                          <div key={invite._id || invite.id} className="invite-item">
-                            <div className="invite-info">
-                              <div className="invite-team-name">{invite.name}</div>
-                              <div className="invite-project">{invite.project.name}</div>
-                              <div className="invite-creator">
-                                by @{invite.creator?.login} ({invite.acceptanceCount || 0}/{invite.totalMembers || 0} accepted)
+                        {pendingInvites.map(invite => {
+                          const alreadyAccepted = invite.myStatus === 'approved';
+                          return (
+                            <div key={invite._id || invite.id} className={`invite-item ${alreadyAccepted ? 'responded' : ''}`}>
+                              <div className="invite-info">
+                                <div className="invite-team-name">{invite.name}</div>
+                                <div className="invite-project">{invite.project.name}</div>
+                                <div className="invite-creator">
+                                  by @{invite.creator?.login} ({invite.acceptanceCount || 0}/{invite.totalMembers || 0} accepted)
+                                </div>
+                              </div>
+                              <div className="invite-actions">
+                                {alreadyAccepted ? (
+                                  <span className="response-badge accepted">Accepted</span>
+                                ) : (
+                                  <>
+                                    <button 
+                                      className="btn-accept"
+                                      onClick={() => handleInviteResponse(invite, true)}
+                                    >
+                                      Accept
+                                    </button>
+                                    <button 
+                                      className="btn-decline"
+                                      onClick={() => handleInviteResponse(invite, false)}
+                                    >
+                                      Decline
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
-                            <div className="invite-actions">
-                              <button 
-                                className="btn-accept"
-                                onClick={() => handleInviteResponse(invite, true)}
-                              >
-                                Accept
-                              </button>
-                              <button 
-                                className="btn-decline"
-                                onClick={() => handleInviteResponse(invite, false)}
-                              >
-                                Decline
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   )}
@@ -1024,29 +1032,42 @@ const FullDashboard = ({ user }) => {
                     <>
                       <h3 className="requests-section-title">Deletion Requests</h3>
                       <div className="invites-list">
-                        {validDeleteRequests.map(request => (
-                          <div key={request._id || request.id} className="invite-item delete-request">
-                            <div className="invite-info">
-                              <div className="invite-team-name">{request.teamName}</div>
-                              <div className="invite-project">{request.project?.name}</div>
-                              <div className="invite-creator">@{request.requestedBy?.login} wants to delete ({request.approvalCount}/{request.totalMembers} approved)</div>
+                        {validDeleteRequests.map(request => {
+                          const alreadyApproved = request.myStatus === 'approved';
+                          const alreadyRejected = request.myStatus === 'rejected';
+                          const alreadyResponded = alreadyApproved || alreadyRejected;
+                          return (
+                            <div key={request._id || request.id} className={`invite-item delete-request ${alreadyResponded ? 'responded' : ''}`}>
+                              <div className="invite-info">
+                                <div className="invite-team-name">{request.teamName}</div>
+                                <div className="invite-project">{request.project?.name}</div>
+                                <div className="invite-creator">@{request.requestedBy?.login} wants to delete ({request.approvalCount}/{request.totalMembers} approved)</div>
+                              </div>
+                              <div className="invite-actions">
+                                {alreadyApproved ? (
+                                  <span className="response-badge accepted">Approved</span>
+                                ) : alreadyRejected ? (
+                                  <span className="response-badge declined">Rejected</span>
+                                ) : (
+                                  <>
+                                    <button 
+                                      className="btn-accept"
+                                      onClick={() => handleDeleteRequestResponse(request, true)}
+                                    >
+                                      Approve
+                                    </button>
+                                    <button 
+                                      className="btn-decline"
+                                      onClick={() => handleDeleteRequestResponse(request, false)}
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div className="invite-actions">
-                              <button 
-                                className="btn-accept"
-                                onClick={() => handleDeleteRequestResponse(request, true)}
-                              >
-                                Approve
-                              </button>
-                              <button 
-                                className="btn-decline"
-                                onClick={() => handleDeleteRequestResponse(request, false)}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   )}

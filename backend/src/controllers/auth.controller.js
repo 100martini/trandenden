@@ -100,12 +100,15 @@ const authController = {
         }
       });
 
+      const intra42Slugs = new Set();
       const userProjects = userData.projects_users || [];
+
       for (const projectUser of userProjects) {
         if (!projectUser.project?.slug) continue;
-
         const is42Cursus = projectUser.cursus_ids?.includes(21);
         if (!is42Cursus) continue;
+
+        intra42Slugs.add(projectUser.project.slug);
 
         let project = await prisma.project.findUnique({
           where: { slug: projectUser.project.slug }
@@ -147,6 +150,22 @@ const authController = {
               finalMark: projectUser.final_mark
             }
           });
+        }
+      }
+
+      const existingUserProjects = await prisma.userProject.findMany({
+        where: { userId: user.id },
+        include: { project: true }
+      });
+
+      for (const up of existingUserProjects) {
+        if (!intra42Slugs.has(up.project.slug)) {
+          if (up.project.isOuterCore) {
+            await prisma.userProject.delete({
+              where: { id: up.id }
+            });
+            console.log(`Removed unsubscribed project: ${up.project.slug}`);
+          }
         }
       }
 
