@@ -1342,7 +1342,6 @@ const FullDashboard = ({ user: userProp }) => {
         )}
       </main>
 
-      {/* ──── PROFILE MODAL (Enhanced) ──── */}
       {showProfile && (
         <div className="modal-overlay" onClick={() => setShowProfile(false)}>
           <div className="profile-modal" onClick={e => e.stopPropagation()}>
@@ -1431,7 +1430,6 @@ const FullDashboard = ({ user: userProp }) => {
         </div>
       )}
 
-      {/* ──── DELETE FRIEND CONFIRMATION ──── */}
       {showDeleteFriendConfirm && friendToDelete && (
         <div className="modal-overlay" onClick={() => { setShowDeleteFriendConfirm(false); setFriendToDelete(null); }}>
           <div className="modal modal-confirm" onClick={e => e.stopPropagation()}>
