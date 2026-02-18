@@ -10,14 +10,18 @@ const WelcomeScreen = ({ user, onComplete }) => {
     return () => clearTimeout(timer);
   }, [onComplete]);
 
-  const firstName = user?.firstName || user?.login || 'Student';
+  // Use nickname if set, otherwise login, otherwise 'Student'
+  const displayName = user?.nickname || user?.firstName || user?.login || 'Student';
+  
   const level = user?.level || 
                 user?.cursusUsers?.find(c => c.cursus?.slug === '42cursus')?.level ||
                 user?.cursusUsers?.[user?.cursusUsers.length - 1]?.level || 0;
                 
   const wallet = user?.wallet || 0;
   const correctionPoints = user?.correctionPoints || 0;
-  const avatarUrl = user?.avatar?.medium || user?.avatar;
+
+  // Prefer customAvatar, fall back to intra avatar
+  const avatarUrl = user?.customAvatar || user?.avatar?.medium || user?.avatar;
 
   return (
     <div className="welcome-screen">
@@ -25,17 +29,18 @@ const WelcomeScreen = ({ user, onComplete }) => {
         {avatarUrl ? (
           <img 
             src={avatarUrl}
-            alt={firstName}
+            alt={displayName}
             className="welcome-avatar"
+            style={{ borderRadius: '50%', objectFit: 'cover' }}
           />
         ) : (
           <div className="welcome-avatar-placeholder">
-            {firstName.substring(0, 2).toUpperCase()}
+            {displayName.substring(0, 2).toUpperCase()}
           </div>
         )}
         
         <h1 className="welcome-title">
-          Welcome back, {firstName}!
+          Welcome back, {displayName}!
         </h1>
         
         <div className="welcome-level">

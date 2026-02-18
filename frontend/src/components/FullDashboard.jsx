@@ -28,6 +28,8 @@ const FullDashboard = ({ user: userProp }) => {
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [teamError, setTeamError] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState(null);
 
   const [activeView, setActiveView] = useState('dashboard');
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -219,6 +221,38 @@ const FullDashboard = ({ user: userProp }) => {
     }
   };
 
+  // Sync with 42 API to pick up newly registered OC projects
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/auth/sync`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 401) {
+          setSyncMessage({ type: 'error', text: 'Session expired — please log in again.' });
+        } else {
+          setSyncMessage({ type: 'error', text: data.error || 'Sync failed' });
+        }
+      } else {
+        // Merge synced data into freshUser
+        setFreshUser(prev => ({
+          ...prev,
+          ...data.user
+        }));
+        setSyncMessage({ type: 'success', text: 'Synced with 42!' });
+      }
+    } catch (err) {
+      setSyncMessage({ type: 'error', text: 'Sync failed' });
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncMessage(null), 3000);
+  };
+
   const handleAddFriendSearch = useCallback(async (query) => {
     if (query.length < 2) { setAddUserResults([]); return; }
     setAddUserSearching(true);
@@ -259,9 +293,7 @@ const FullDashboard = ({ user: userProp }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        if (data.autoAccepted) {
-          fetchFriends();
-        }
+        if (data.autoAccepted) fetchFriends();
         fetchPendingFriendRequests();
         if (addUserSearch.length >= 2) handleAddFriendSearch(addUserSearch);
       }
@@ -294,9 +326,7 @@ const FullDashboard = ({ user: userProp }) => {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        fetchFriends();
-      }
+      if (response.ok) fetchFriends();
     } catch (err) {
       console.error('Failed to remove friend');
     }
@@ -305,6 +335,8 @@ const FullDashboard = ({ user: userProp }) => {
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Reset input value so the same file can be re-selected after a reset
+    e.target.value = '';
     if (file.size > 2 * 1024 * 1024) {
       setProfileError('Image must be smaller than 2MB');
       return;
@@ -318,6 +350,7 @@ const FullDashboard = ({ user: userProp }) => {
       setProfileAvatarPreview(ev.target.result);
       setProfileAvatarData(ev.target.result);
       setProfileError(null);
+      setProfileSuccess(null);
     };
     reader.readAsDataURL(file);
   };
@@ -329,17 +362,23 @@ const FullDashboard = ({ user: userProp }) => {
     try {
       const token = getToken();
       const body = {};
-      if (profileNickname !== (user?.nickname || '')) {
-        body.nickname = profileNickname;
+
+      const currentNickname = user?.nickname || '';
+      const newNickname = profileNickname.trim();
+
+      if (newNickname !== currentNickname) {
+        body.nickname = newNickname;
       }
       if (profileAvatarData) {
         body.customAvatar = profileAvatarData;
       }
+
       if (Object.keys(body).length === 0) {
         setProfileError('No changes to save');
         setProfileSaving(false);
         return;
       }
+
       const response = await fetch(`${API_URL}/profile`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -348,9 +387,17 @@ const FullDashboard = ({ user: userProp }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to save');
       setFreshUser(prev => ({ ...prev, ...data }));
-      setProfileSuccess('Profile updated!');
+
+      if (body.nickname !== undefined && body.customAvatar) {
+        setProfileSuccess('Nickname and avatar updated successfully!');
+      } else if (body.nickname !== undefined) {
+        setProfileSuccess(body.nickname === '' ? 'Nickname removed!' : 'Nickname changed successfully!');
+      } else if (body.customAvatar) {
+        setProfileSuccess('Avatar updated successfully!');
+      }
+
       setProfileAvatarData(null);
-      setTimeout(() => setProfileSuccess(null), 2000);
+      setTimeout(() => setProfileSuccess(null), 3000);
     } catch (err) {
       setProfileError(err.message);
     }
@@ -371,8 +418,10 @@ const FullDashboard = ({ user: userProp }) => {
         setFreshUser(prev => ({ ...prev, ...data }));
         setProfileAvatarPreview(null);
         setProfileAvatarData(null);
-        setProfileSuccess('Avatar reset to intra photo');
-        setTimeout(() => setProfileSuccess(null), 2000);
+        // Reset the file input so it can be clicked again immediately
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setProfileSuccess('Avatar reset to intra photo!');
+        setTimeout(() => setProfileSuccess(null), 3000);
       }
     } catch (err) {
       setProfileError('Failed to reset avatar');
@@ -446,11 +495,11 @@ const FullDashboard = ({ user: userProp }) => {
   const canCreateTeam = teamName.trim() !== '' && selectedMembers.length >= minMembers;
 
   const getCurriculumProjects = useMemo(() => {
-    if (projectsLoading || allProjects.length === 0) return {};
-    
+    if (allProjects.length === 0) return {};
+
     const projectsByCircle = {};
     const userCurriculum = curriculum === 'unknown' ? 'old' : curriculum;
-    
+
     allProjects.forEach(project => {
       if (project.isOuterCore) return;
       if (project.curricula.includes(userCurriculum)) {
@@ -466,9 +515,9 @@ const FullDashboard = ({ user: userProp }) => {
         });
       }
     });
-    
+
     return projectsByCircle;
-  }, [allProjects, curriculum, projectsLoading]);
+  }, [allProjects, curriculum]);
 
   const getUserProjectStatus = useCallback((projectSlug) => {
     const normalizedSlug = projectSlug.toLowerCase().replace(/_/g, '-');
@@ -510,10 +559,10 @@ const FullDashboard = ({ user: userProp }) => {
   }, [getCircleProjects]);
 
   const allCCProjects = useMemo(() => {
-    if (!isTranscender || projectsLoading) return [];
+    if (!isTranscender) return [];
     const projects = [];
     const userCurriculum = curriculum === 'unknown' ? 'old' : curriculum;
-    
+
     allProjects.forEach(project => {
       if (project.curricula.includes(userCurriculum) && !project.isOuterCore) {
         const userStatus = getUserProjectStatus(project.slug);
@@ -530,9 +579,9 @@ const FullDashboard = ({ user: userProp }) => {
         }
       }
     });
-    
+
     return projects;
-  }, [isTranscender, allProjects, curriculum, getUserProjectStatus, projectsLoading]);
+  }, [isTranscender, allProjects, curriculum, getUserProjectStatus]);
 
   const isExcludedOC = (slug) => {
     const s = slug.toLowerCase();
@@ -708,7 +757,7 @@ const FullDashboard = ({ user: userProp }) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const validDeleteRequests = useMemo(() => 
+  const validDeleteRequests = useMemo(() =>
     deleteRequests.filter(req => req.requestedBy?.login && req.teamName),
   [deleteRequests]);
 
@@ -718,11 +767,11 @@ const FullDashboard = ({ user: userProp }) => {
   const actionableCount = actionableInvitesCount + actionableDeleteCount;
   const pendingFriendCount = pendingFriendRequests.incoming?.length || 0;
 
-  const totalActive = userProjects.filter(p => 
+  const totalActive = userProjects.filter(p =>
     p.status === 'in_progress' || p.status === 'searching_a_group'
   ).length;
-  
-  const totalCompleted = userProjects.filter(p => 
+
+  const totalCompleted = userProjects.filter(p =>
     p.status === 'finished' && p['validated?']
   ).length;
 
@@ -731,19 +780,15 @@ const FullDashboard = ({ user: userProp }) => {
     "the Bug Slayer", "the Chosen One", "the Code Wizard"
   ];
 
-  const randomTitle = useMemo(() => 
-    titles[Math.floor(Math.random() * titles.length)], 
+  const randomTitle = useMemo(() =>
+    titles[Math.floor(Math.random() * titles.length)],
   []);
 
   const displayedFriends = friendSearch ? friendSearchResults : friends;
 
-  if (projectsLoading) {
-    return (
-      <div className="full-dashboard">
-        <div className="loading">Loading projects...</div>
-      </div>
-    );
-  }
+  // ─── NO MORE EARLY RETURN FOR projectsLoading ───
+  // We render the full dashboard immediately and show skeleton/spinner only
+  // inside the projects grid where it's needed.
 
   return (
     <div className="full-dashboard">
@@ -829,6 +874,24 @@ const FullDashboard = ({ user: userProp }) => {
                 <span className="curriculum-badge">
                   {curriculum === 'old' ? 'C/C++' : curriculum === 'new' ? 'Python' : 'Detecting...'}
                 </span>
+                <button
+                  className={`btn-sync ${syncing ? 'btn-sync--loading' : ''}`}
+                  onClick={handleSync}
+                  disabled={syncing}
+                  title="Sync projects with 42 intranet"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={syncing ? 'spin' : ''}>
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                  </svg>
+                  {syncing ? 'Syncing...' : 'Sync'}
+                </button>
+                {syncMessage && (
+                  <span className={`sync-message sync-message--${syncMessage.type}`}>
+                    {syncMessage.text}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -885,7 +948,7 @@ const FullDashboard = ({ user: userProp }) => {
                     const isCurrent = milestone === currentCircle;
                     const isCompleted = milestone < currentCircle;
                     const isActive = milestone === activeCircle;
-                    
+
                     return (
                       <button
                         key={milestone}
@@ -913,33 +976,37 @@ const FullDashboard = ({ user: userProp }) => {
                 </div>
 
                 <div className="projects-grid">
-                  {circleProjects.map((project, idx) => {
-                    const badge = getStatusBadge(project.userStatus);
-                    const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
-                    const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
-                    const hasPendingTeam = !!pendingTeam;
-                    
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`project-card ${activeTeam ? 'has-team' : ''} ${hasPendingTeam ? 'pending-team' : ''}`}
-                        onClick={() => !activeTeam && !hasPendingTeam && handleProjectClick(project)}
-                      >
-                        <div className="project-header">
-                          <div className="project-icon">
-                            {project.name.substring(0, 2).toUpperCase()}
+                  {projectsLoading ? (
+                    <div className="projects-loading-inline">Loading projects…</div>
+                  ) : (
+                    circleProjects.map((project, idx) => {
+                      const badge = getStatusBadge(project.userStatus);
+                      const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
+                      const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
+                      const hasPendingTeam = !!pendingTeam;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`project-card ${activeTeam ? 'has-team' : ''} ${hasPendingTeam ? 'pending-team' : ''}`}
+                          onClick={() => !activeTeam && !hasPendingTeam && handleProjectClick(project)}
+                        >
+                          <div className="project-header">
+                            <div className="project-icon">
+                              {project.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span className={`project-badge ${activeTeam ? 'badge-completed' : hasPendingTeam ? 'badge-pending' : badge.className}`}>
+                              {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : badge.text}
+                            </span>
                           </div>
-                          <span className={`project-badge ${activeTeam ? 'badge-completed' : hasPendingTeam ? 'badge-pending' : badge.className}`}>
-                            {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : badge.text}
-                          </span>
+                          <div className="project-name">{project.name}</div>
+                          <div className="project-meta">
+                            {project.team > 1 || project.minTeam > 1 ? 'Team' : 'Solo'}
+                          </div>
                         </div>
-                        <div className="project-name">{project.name}</div>
-                        <div className="project-meta">
-                          {project.team > 1 || project.minTeam > 1 ? `Team` : 'Solo'}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </>
             )}
@@ -957,10 +1024,10 @@ const FullDashboard = ({ user: userProp }) => {
                 {myTeams.filter(t => t.status === 'approved' || t.isPending).map(team => {
                   const isPendingDelete = !!(team.deleteRequest && team.deleteRequest.requestedBy);
                   const isPendingAcceptance = team.isPending && !isPendingDelete;
-                  
+
                   return (
-                    <div 
-                      key={team._id || team.id} 
+                    <div
+                      key={team._id || team.id}
                       className={`team-card ${isPendingDelete ? 'pending-delete' : ''} ${isPendingAcceptance ? 'pending-acceptance' : ''}`}
                       onClick={() => !isPendingDelete && !isPendingAcceptance && goToTeamKanban(team)}
                     >
@@ -1056,10 +1123,10 @@ const FullDashboard = ({ user: userProp }) => {
                           const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
                           const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
                           const hasPendingTeam = !!pendingTeam;
-                          
+
                           return (
-                            <div 
-                              key={idx} 
+                            <div
+                              key={idx}
                               className={`project-card ${activeTeam ? 'has-team' : ''} ${hasPendingTeam ? 'pending-team' : ''}`}
                               onClick={() => !activeTeam && !hasPendingTeam && handleProjectClick(project)}
                             >
@@ -1080,7 +1147,7 @@ const FullDashboard = ({ user: userProp }) => {
                     ) : (
                       <div className="empty-state">
                         <h3>No Outer Core Projects</h3>
-                        <p>Register for projects on the intranet to start your outer core journey.</p>
+                        <p>Register for projects on the intranet, then click <strong>Sync</strong> above to load them.</p>
                       </div>
                     )}
                   </>
@@ -1290,16 +1357,23 @@ const FullDashboard = ({ user: userProp }) => {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-body">
               <div className="profile-avatar-section">
-                <div className="profile-avatar-wrapper" onClick={() => fileInputRef.current?.click()}>
+                <div
+                  className="profile-avatar-wrapper"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ position: 'relative', width: 100, height: 100, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, margin: '0 auto' }}
+                >
                   {profileAvatarPreview ? (
-                    <img src={profileAvatarPreview} alt="Preview" className="profile-avatar-large" />
+                    <img src={profileAvatarPreview} alt="Preview" className="profile-avatar-large" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
                   ) : avatarUrl ? (
-                    <img src={avatarUrl} alt={username} className="profile-avatar-large" />
+                    <img src={avatarUrl} alt={username} className="profile-avatar-large" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
                   ) : (
-                    <div className="profile-avatar-large-placeholder">{getInitials(username)}</div>
+                    <div className="profile-avatar-large-placeholder" style={{ width: '100%', height: '100%', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700 }}>{getInitials(username)}</div>
                   )}
-                  <div className="profile-avatar-overlay">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  <div className="profile-avatar-overlay" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', borderRadius: '50%' }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                    onMouseLeave={e => e.currentTarget.style.opacity = 0}
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
                   </div>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleAvatarChange} style={{ display: 'none' }} />
@@ -1378,20 +1452,20 @@ const FullDashboard = ({ user: userProp }) => {
             <div className="modal-body">
               <p><strong>{selectedProject.name}</strong></p>
               <p>Team size: {selectedProject.minTeam}{selectedProject.maxTeam && selectedProject.maxTeam !== selectedProject.minTeam ? `-${selectedProject.maxTeam}` : ''} members (you + {minMembers}{maxMembers !== minMembers ? `-${maxMembers}` : ''} others)</p>
-              
+
               <div className="team-form">
-                <input 
-                  type="text" 
-                  placeholder="Team name *" 
+                <input
+                  type="text"
+                  placeholder="Team name *"
                   className={`team-input ${!teamName.trim() ? 'input-required' : ''}`}
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                 />
-                
+
                 <div className="search-container">
-                  <input 
-                    type="text" 
-                    placeholder="Search member by login..." 
+                  <input
+                    type="text"
+                    placeholder="Search member by login..."
                     className="team-input"
                     value={searchQuery}
                     onChange={handleSearchChange}
@@ -1438,15 +1512,16 @@ const FullDashboard = ({ user: userProp }) => {
                   ))}
                 </div>
               </div>
+              {teamError && <div className="profile-message error">{teamError}</div>}
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={closeModal}>Cancel</button>
-              <button 
-                className={`btn-primary ${!canCreateTeam ? 'btn-disabled' : ''}`} 
+              <button
+                className={`btn-primary ${!canCreateTeam || isCreatingTeam ? 'btn-disabled' : ''}`}
                 onClick={handleTeamCreated}
-                disabled={!canCreateTeam}
+                disabled={!canCreateTeam || isCreatingTeam}
               >
-                Create Team
+                {isCreatingTeam ? 'Creating...' : 'Create Team'}
               </button>
             </div>
           </div>

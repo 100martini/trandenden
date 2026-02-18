@@ -2,6 +2,114 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const prisma = require('../prisma');
 
+async function syncUserFrom42(userData, userId) {
+  const validatedSlugs = (userData.projects_users || [])
+    .filter(p => p['validated?'] === true)
+    .map(p => p.project?.slug)
+    .filter(Boolean);
+
+  const allSlugs = (userData.projects_users || [])
+    .map(p => p.project?.slug)
+    .filter(Boolean);
+
+  const matchedValidated = await prisma.project.findMany({
+    where: { slug: { in: validatedSlugs } }
+  });
+
+  const matchedAll = await prisma.project.findMany({
+    where: { slug: { in: allSlugs } }
+  });
+
+  const highestValidatedCircle = matchedValidated.length > 0
+    ? Math.max(...matchedValidated.map(p => p.circle))
+    : 0;
+
+  const highestRegisteredCircle = matchedAll.length > 0
+    ? Math.max(...matchedAll.map(p => p.circle))
+    : 0;
+
+  const currentCircle = Math.max(
+    highestRegisteredCircle,
+    Math.min(highestValidatedCircle + 1, 6)
+  );
+
+  const projectSlugs = (userData.projects_users || []).map(p => p.project?.slug).filter(Boolean);
+  const hasPythonProjects = projectSlugs.some(slug => slug.includes('python-module'));
+  const curriculum = hasPythonProjects ? 'new' : 'old';
+
+  const cursus42 = userData.cursus_users?.find(c => c.cursus?.slug === '42cursus' || c.cursus_id === 21);
+  const grade = cursus42?.grade || 'Cadet';
+
+  const intra42Slugs = new Set();
+  const userProjects = userData.projects_users || [];
+
+  for (const projectUser of userProjects) {
+    if (!projectUser.project?.slug) continue;
+    const is42Cursus = projectUser.cursus_ids?.includes(21);
+    if (!is42Cursus) continue;
+
+    intra42Slugs.add(projectUser.project.slug);
+
+    let project = await prisma.project.findUnique({
+      where: { slug: projectUser.project.slug }
+    });
+
+    if (!project) {
+      try {
+        project = await prisma.project.create({
+          data: {
+            slug: projectUser.project.slug,
+            name: projectUser.project.name || projectUser.project.slug,
+            circle: 0,
+            minTeam: 1,
+            maxTeam: 1,
+            isOuterCore: true
+          }
+        });
+        console.log(`Created outer core project: ${project.slug}`);
+      } catch (err) {
+        project = await prisma.project.findUnique({
+          where: { slug: projectUser.project.slug }
+        });
+      }
+    }
+
+    if (project) {
+      await prisma.userProject.upsert({
+        where: { userId_projectId: { userId, projectId: project.id } },
+        update: {
+          status: projectUser.status,
+          validated: projectUser['validated?'] || false,
+          finalMark: projectUser.final_mark
+        },
+        create: {
+          userId,
+          projectId: project.id,
+          status: projectUser.status,
+          validated: projectUser['validated?'] || false,
+          finalMark: projectUser.final_mark
+        }
+      });
+    }
+  }
+
+  const existingUserProjects = await prisma.userProject.findMany({
+    where: { userId },
+    include: { project: true }
+  });
+
+  for (const up of existingUserProjects) {
+    if (!intra42Slugs.has(up.project.slug)) {
+      if (up.project.isOuterCore) {
+        await prisma.userProject.delete({ where: { id: up.id } });
+        console.log(`Removed unsubscribed project: ${up.project.slug}`);
+      }
+    }
+  }
+
+  return { currentCircle, curriculum, grade, cursus42 };
+}
+
 const authController = {
   async redirect42(req, res) {
     const authUrl = `https://api.intra.42.fr/oauth/authorize?client_id=${process.env.CLIENT_ID}&redirect_uri=${process.env.REDIRECT_URI}&response_type=code`;
@@ -11,7 +119,7 @@ const authController = {
 
   async callback(req, res) {
     const { code } = req.query;
-    
+
     if (!code) {
       return res.redirect(`${process.env.FRONTEND_URL}?error=no_code`);
     }
@@ -31,43 +139,7 @@ const authController = {
       });
 
       const userData = userResponse.data;
-
-      const validatedSlugs = (userData.projects_users || [])
-        .filter(p => p['validated?'] === true)
-        .map(p => p.project?.slug)
-        .filter(Boolean);
-
-      const allSlugs = (userData.projects_users || [])
-        .map(p => p.project?.slug)
-        .filter(Boolean);
-
-      const matchedValidated = await prisma.project.findMany({
-        where: { slug: { in: validatedSlugs } }
-      });
-
-      const matchedAll = await prisma.project.findMany({
-        where: { slug: { in: allSlugs } }
-      });
-
-      const highestValidatedCircle = matchedValidated.length > 0
-        ? Math.max(...matchedValidated.map(p => p.circle))
-        : 0;
-
-      const highestRegisteredCircle = matchedAll.length > 0
-        ? Math.max(...matchedAll.map(p => p.circle))
-        : 0;
-
-      const currentCircle = Math.max(
-        highestRegisteredCircle,
-        Math.min(highestValidatedCircle + 1, 6)
-      );
-
-      const projectSlugs = (userData.projects_users || []).map(p => p.project?.slug).filter(Boolean);
-      const hasPythonProjects = projectSlugs.some(slug => slug.includes('python-module'));
-      const curriculum = hasPythonProjects ? 'new' : 'old';
-
       const cursus42 = userData.cursus_users?.find(c => c.cursus?.slug === '42cursus' || c.cursus_id === 21);
-      const grade = cursus42?.grade || 'Cadet';
 
       const user = await prisma.user.upsert({
         where: { intraId: userData.id },
@@ -80,9 +152,7 @@ const authController = {
           level: cursus42?.level || 0,
           wallet: userData.wallet || 0,
           correctionPoints: userData.correction_point || 0,
-          curriculum,
-          grade,
-          currentCircle
+          accessToken
         },
         create: {
           intraId: userData.id,
@@ -94,80 +164,16 @@ const authController = {
           level: cursus42?.level || 0,
           wallet: userData.wallet || 0,
           correctionPoints: userData.correction_point || 0,
-          curriculum,
-          grade,
-          currentCircle
+          accessToken
         }
       });
 
-      const intra42Slugs = new Set();
-      const userProjects = userData.projects_users || [];
+      const { currentCircle, curriculum, grade } = await syncUserFrom42(userData, user.id);
 
-      for (const projectUser of userProjects) {
-        if (!projectUser.project?.slug) continue;
-        const is42Cursus = projectUser.cursus_ids?.includes(21);
-        if (!is42Cursus) continue;
-
-        intra42Slugs.add(projectUser.project.slug);
-
-        let project = await prisma.project.findUnique({
-          where: { slug: projectUser.project.slug }
-        });
-
-        if (!project) {
-          try {
-            project = await prisma.project.create({
-              data: {
-                slug: projectUser.project.slug,
-                name: projectUser.project.name || projectUser.project.slug,
-                circle: 0,
-                minTeam: 1,
-                maxTeam: 1,
-                isOuterCore: true
-              }
-            });
-            console.log(`Created outer core project: ${project.slug}`);
-          } catch (err) {
-            project = await prisma.project.findUnique({
-              where: { slug: projectUser.project.slug }
-            });
-          }
-        }
-
-        if (project) {
-          await prisma.userProject.upsert({
-            where: { userId_projectId: { userId: user.id, projectId: project.id } },
-            update: {
-              status: projectUser.status,
-              validated: projectUser['validated?'] || false,
-              finalMark: projectUser.final_mark
-            },
-            create: {
-              userId: user.id,
-              projectId: project.id,
-              status: projectUser.status,
-              validated: projectUser['validated?'] || false,
-              finalMark: projectUser.final_mark
-            }
-          });
-        }
-      }
-
-      const existingUserProjects = await prisma.userProject.findMany({
-        where: { userId: user.id },
-        include: { project: true }
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { currentCircle, curriculum, grade }
       });
-
-      for (const up of existingUserProjects) {
-        if (!intra42Slugs.has(up.project.slug)) {
-          if (up.project.isOuterCore) {
-            await prisma.userProject.delete({
-              where: { id: up.id }
-            });
-            console.log(`Removed unsubscribed project: ${up.project.slug}`);
-          }
-        }
-      }
 
       const token = jwt.sign(
         { userId: user.id, intraId: user.intraId, login: user.login },
@@ -181,15 +187,78 @@ const authController = {
     }
   },
 
+  async sync(req, res) {
+    try {
+      const user = await prisma.user.findUnique({ where: { id: req.userId } });
+      if (!user || !user.accessToken) {
+        return res.status(400).json({ error: 'No stored access token. Please log in again.' });
+      }
+
+      let userData;
+      try {
+        const userResponse = await axios.get('https://api.intra.42.fr/v2/me', {
+          headers: { Authorization: `Bearer ${user.accessToken}` }
+        });
+        userData = userResponse.data;
+      } catch (err) {
+        if (err.response?.status === 401) {
+          return res.status(401).json({ error: 'Access token expired. Please log in again.' });
+        }
+        throw err;
+      }
+
+      const cursus42 = userData.cursus_users?.find(c => c.cursus?.slug === '42cursus' || c.cursus_id === 21);
+
+      const { currentCircle, curriculum, grade } = await syncUserFrom42(userData, user.id);
+
+      const updated = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          level: cursus42?.level || user.level,
+          wallet: userData.wallet ?? user.wallet,
+          correctionPoints: userData.correction_point ?? user.correctionPoints,
+          currentCircle,
+          curriculum,
+          grade
+        },
+        include: { userProjects: { include: { project: true } } }
+      });
+
+      res.json({
+        success: true,
+        user: {
+          id: updated.id,
+          currentCircle: updated.currentCircle,
+          curriculum: updated.curriculum,
+          grade: updated.grade,
+          level: updated.level,
+          wallet: updated.wallet,
+          correctionPoints: updated.correctionPoints,
+          projectsUsers: updated.userProjects.map(up => ({
+            project: {
+              slug: up.project.slug,
+              name: up.project.name,
+              isOuterCore: up.project.isOuterCore
+            },
+            status: up.status,
+            'validated?': up.validated,
+            final_mark: up.finalMark
+          }))
+        }
+      });
+    } catch (error) {
+      console.error('Sync error:', error.message);
+      res.status(500).json({ error: 'Failed to sync with 42 API' });
+    }
+  },
+
   async me(req, res) {
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.userId },
         include: {
           userProjects: {
-            include: {
-              project: true
-            }
+            include: { project: true }
           }
         }
       });
@@ -240,21 +309,19 @@ const authController = {
       }
 
       const where = {
-        login: { contains: q, mode: 'insensitive' },
+        OR: [
+          { login: { contains: q, mode: 'insensitive' } },
+          { nickname: { contains: q, mode: 'insensitive' } }
+        ],
         id: { not: req.userId }
       };
 
       if (projectSlug === 'ft_transcendence') {
       } else {
-        if (curriculum) {
-          where.curriculum = curriculum;
-        }
+        if (curriculum) where.curriculum = curriculum;
         if (grade) {
-          if (grade === 'Cadet') {
-            where.grade = 'Cadet';
-          } else {
-            where.grade = { not: 'Cadet' };
-          }
+          if (grade === 'Cadet') where.grade = 'Cadet';
+          else where.grade = { not: 'Cadet' };
         }
       }
 
@@ -290,7 +357,7 @@ const authController = {
         intraId: u.intraId,
         login: u.login,
         displayName: u.displayName,
-        avatar: u.avatar,
+        avatar: u.customAvatar || u.avatar,
         nickname: u.nickname,
         campus: u.campus,
         level: u.level,
