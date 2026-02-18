@@ -28,10 +28,10 @@ const FullDashboard = ({ user: userProp }) => {
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [teamError, setTeamError] = useState(null);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState(null);
 
-  const [activeView, setActiveView] = useState('dashboard');
+  const [activeView, setActiveView] = useState(() => {
+    return sessionStorage.getItem('dashboardView') || 'dashboard';
+  });
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const userMenuRef = useRef(null);
@@ -46,6 +46,7 @@ const FullDashboard = ({ user: userProp }) => {
   const [profileError, setProfileError] = useState(null);
   const [profileSuccess, setProfileSuccess] = useState(null);
   const fileInputRef = useRef(null);
+  const justSavedRef = useRef(false);
 
   const [friends, setFriends] = useState([]);
   const [pendingFriendRequests, setPendingFriendRequests] = useState({ incoming: [], outgoing: [] });
@@ -56,6 +57,9 @@ const FullDashboard = ({ user: userProp }) => {
   const [addUserResults, setAddUserResults] = useState([]);
   const [addUserSearching, setAddUserSearching] = useState(false);
   const [friendsTab, setFriendsTab] = useState('friends');
+
+  const [showDeleteFriendConfirm, setShowDeleteFriendConfirm] = useState(false);
+  const [friendToDelete, setFriendToDelete] = useState(null);
 
   const username = user?.login || 'user';
   const currentUserId = user?.intraId || user?.id;
@@ -76,6 +80,10 @@ const FullDashboard = ({ user: userProp }) => {
 
   const isCadet = grade === 'Cadet';
   const isTranscender = grade === 'Transcender' || grade === 'Member';
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboardView', activeView);
+  }, [activeView]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -102,6 +110,21 @@ const FullDashboard = ({ user: userProp }) => {
     }
   }, []);
 
+  const silentSync = useCallback(async () => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_URL}/auth/sync`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFreshUser(prev => prev ? { ...prev, ...data.user } : data.user);
+      }
+    } catch (err) {
+    }
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       await fetchFreshUser();
@@ -109,6 +132,7 @@ const FullDashboard = ({ user: userProp }) => {
       fetchMyTeams();
       fetchPendingInvites();
       fetchDeleteRequests();
+      silentSync();
     };
     init();
 
@@ -130,6 +154,10 @@ const FullDashboard = ({ user: userProp }) => {
 
   useEffect(() => {
     if (showProfile && user) {
+      if (justSavedRef.current) {
+        justSavedRef.current = false;
+        return;
+      }
       setProfileNickname(user.nickname || '');
       setProfileAvatarPreview(null);
       setProfileAvatarData(null);
@@ -221,40 +249,8 @@ const FullDashboard = ({ user: userProp }) => {
     }
   };
 
-  // Sync with 42 API to pick up newly registered OC projects
-  const handleSync = async () => {
-    setSyncing(true);
-    setSyncMessage(null);
-    try {
-      const token = getToken();
-      const response = await fetch(`${API_URL}/auth/sync`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        if (response.status === 401) {
-          setSyncMessage({ type: 'error', text: 'Session expired — please log in again.' });
-        } else {
-          setSyncMessage({ type: 'error', text: data.error || 'Sync failed' });
-        }
-      } else {
-        // Merge synced data into freshUser
-        setFreshUser(prev => ({
-          ...prev,
-          ...data.user
-        }));
-        setSyncMessage({ type: 'success', text: 'Synced with 42!' });
-      }
-    } catch (err) {
-      setSyncMessage({ type: 'error', text: 'Sync failed' });
-    }
-    setSyncing(false);
-    setTimeout(() => setSyncMessage(null), 3000);
-  };
-
   const handleAddFriendSearch = useCallback(async (query) => {
-    if (query.length < 2) { setAddUserResults([]); return; }
+    if (query.length < 2) { setAddUserResults([]); setAddUserSearching(false); return; }
     setAddUserSearching(true);
     try {
       const token = getToken();
@@ -269,7 +265,7 @@ const FullDashboard = ({ user: userProp }) => {
   }, []);
 
   const handleFriendSearch = useCallback(async (query) => {
-    if (query.length < 1) { setFriendSearchResults([]); return; }
+    if (query.length < 1) { setFriendSearchResults([]); setFriendSearching(false); return; }
     setFriendSearching(true);
     try {
       const token = getToken();
@@ -319,10 +315,16 @@ const FullDashboard = ({ user: userProp }) => {
     }
   };
 
-  const removeFriend = async (friendshipId) => {
+  const handleRemoveFriendClick = (friend) => {
+    setFriendToDelete(friend);
+    setShowDeleteFriendConfirm(true);
+  };
+
+  const confirmRemoveFriend = async () => {
+    if (!friendToDelete) return;
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/friends/${friendshipId}`, {
+      const response = await fetch(`${API_URL}/friends/${friendToDelete.friendshipId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -330,12 +332,13 @@ const FullDashboard = ({ user: userProp }) => {
     } catch (err) {
       console.error('Failed to remove friend');
     }
+    setShowDeleteFriendConfirm(false);
+    setFriendToDelete(null);
   };
 
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Reset input value so the same file can be re-selected after a reset
     e.target.value = '';
     if (file.size > 2 * 1024 * 1024) {
       setProfileError('Image must be smaller than 2MB');
@@ -386,6 +389,8 @@ const FullDashboard = ({ user: userProp }) => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to save');
+
+      justSavedRef.current = true;
       setFreshUser(prev => ({ ...prev, ...data }));
 
       if (body.nickname !== undefined && body.customAvatar) {
@@ -397,7 +402,7 @@ const FullDashboard = ({ user: userProp }) => {
       }
 
       setProfileAvatarData(null);
-      setTimeout(() => setProfileSuccess(null), 3000);
+      setTimeout(() => setProfileSuccess(null), 4000);
     } catch (err) {
       setProfileError(err.message);
     }
@@ -415,13 +420,13 @@ const FullDashboard = ({ user: userProp }) => {
       });
       const data = await response.json();
       if (response.ok) {
+        justSavedRef.current = true;
         setFreshUser(prev => ({ ...prev, ...data }));
         setProfileAvatarPreview(null);
         setProfileAvatarData(null);
-        // Reset the file input so it can be clicked again immediately
         if (fileInputRef.current) fileInputRef.current.value = '';
         setProfileSuccess('Avatar reset to intra photo!');
-        setTimeout(() => setProfileSuccess(null), 3000);
+        setTimeout(() => setProfileSuccess(null), 4000);
       }
     } catch (err) {
       setProfileError('Failed to reset avatar');
@@ -433,6 +438,7 @@ const FullDashboard = ({ user: userProp }) => {
     removeToken();
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('welcomeShown');
+    sessionStorage.removeItem('dashboardView');
     navigate('/login');
   }, [navigate]);
 
@@ -786,10 +792,6 @@ const FullDashboard = ({ user: userProp }) => {
 
   const displayedFriends = friendSearch ? friendSearchResults : friends;
 
-  // ─── NO MORE EARLY RETURN FOR projectsLoading ───
-  // We render the full dashboard immediately and show skeleton/spinner only
-  // inside the projects grid where it's needed.
-
   return (
     <div className="full-dashboard">
       <aside className="sidebar">
@@ -825,7 +827,13 @@ const FullDashboard = ({ user: userProp }) => {
             <span>Chat</span>
           </a>
           <a href="#" className="nav-item">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="6" width="20" height="12" rx="2"/>
+              <circle cx="8" cy="12" r="2"/>
+              <line x1="14" y1="10" x2="14" y2="10.01"/>
+              <line x1="18" y1="12" x2="18" y2="12.01"/>
+              <line x1="16" y1="14" x2="16" y2="14.01"/>
+            </svg>
             <span>Games</span>
           </a>
         </nav>
@@ -837,6 +845,7 @@ const FullDashboard = ({ user: userProp }) => {
             <div className="user-avatar">{getInitials(username)}</div>
           )}
           <div className="user-info">
+            {user?.nickname && <div className="user-nickname">{user.nickname}</div>}
             <div className="user-login">@{username}</div>
           </div>
           <button onClick={() => setShowUserMenu(!showUserMenu)} className="logout-dots" title="Options">
@@ -874,24 +883,6 @@ const FullDashboard = ({ user: userProp }) => {
                 <span className="curriculum-badge">
                   {curriculum === 'old' ? 'C/C++' : curriculum === 'new' ? 'Python' : 'Detecting...'}
                 </span>
-                <button
-                  className={`btn-sync ${syncing ? 'btn-sync--loading' : ''}`}
-                  onClick={handleSync}
-                  disabled={syncing}
-                  title="Sync projects with 42 intranet"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={syncing ? 'spin' : ''}>
-                    <polyline points="23 4 23 10 17 10"/>
-                    <polyline points="1 20 1 14 7 14"/>
-                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                  </svg>
-                  {syncing ? 'Syncing...' : 'Sync'}
-                </button>
-                {syncMessage && (
-                  <span className={`sync-message sync-message--${syncMessage.type}`}>
-                    {syncMessage.text}
-                  </span>
-                )}
               </div>
             </div>
 
@@ -1147,7 +1138,7 @@ const FullDashboard = ({ user: userProp }) => {
                     ) : (
                       <div className="empty-state">
                         <h3>No Outer Core Projects</h3>
-                        <p>Register for projects on the intranet, then click <strong>Sync</strong> above to load them.</p>
+                        <p>Register for projects on the intranet and they'll appear here automatically.</p>
                       </div>
                     )}
                   </>
@@ -1207,7 +1198,7 @@ const FullDashboard = ({ user: userProp }) => {
                             <div className="friend-login">@{friend.login}</div>
                             <div className="friend-meta">{friend.campus} · Level {friend.level?.toFixed(2)}</div>
                           </div>
-                          <button className="friend-remove" onClick={() => removeFriend(friend.friendshipId)} title="Remove friend">
+                          <button className="friend-remove" onClick={() => handleRemoveFriendClick(friend)} title="Remove friend">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                           </button>
                         </div>
@@ -1236,7 +1227,6 @@ const FullDashboard = ({ user: userProp }) => {
                   />
                   {addUserSearch && <button className="friends-search-clear" onClick={() => { setAddUserSearch(''); setAddUserResults([]); }}>×</button>}
                 </div>
-                {addUserSearching && addUserSearch.length > 0 && <div className="search-loading">Searching...</div>}
 
                 {addUserResults.length > 0 ? (
                   <div className="friends-grid">
@@ -1352,91 +1342,110 @@ const FullDashboard = ({ user: userProp }) => {
         )}
       </main>
 
+      {/* ──── PROFILE MODAL (Enhanced) ──── */}
       {showProfile && (
         <div className="modal-overlay" onClick={() => setShowProfile(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
-            <div className="modal-body">
-              <div className="profile-avatar-section">
-                <div
-                  className="profile-avatar-wrapper"
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{ position: 'relative', width: 100, height: 100, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, margin: '0 auto' }}
-                >
-                  {profileAvatarPreview ? (
-                    <img src={profileAvatarPreview} alt="Preview" className="profile-avatar-large" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
-                  ) : avatarUrl ? (
-                    <img src={avatarUrl} alt={username} className="profile-avatar-large" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
-                  ) : (
-                    <div className="profile-avatar-large-placeholder" style={{ width: '100%', height: '100%', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700 }}>{getInitials(username)}</div>
-                  )}
-                  <div className="profile-avatar-overlay" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s', borderRadius: '50%' }}
-                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                    onMouseLeave={e => e.currentTarget.style.opacity = 0}
-                  >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                  </div>
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleAvatarChange} style={{ display: 'none' }} />
-                {user?.customAvatar && (
-                  <button className="btn-reset-avatar" onClick={handleResetAvatar} disabled={profileSaving}>
-                    Reset to intra photo
-                  </button>
+          <div className="profile-modal" onClick={e => e.stopPropagation()}>
+            <div className="profile-modal-banner">
+              <button className="profile-modal-close" onClick={() => setShowProfile(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <div className="profile-modal-avatar-area">
+              <div
+                className="profile-modal-avatar-wrapper"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {profileAvatarPreview ? (
+                  <img src={profileAvatarPreview} alt="Preview" className="profile-modal-avatar-img" />
+                ) : avatarUrl ? (
+                  <img src={avatarUrl} alt={username} className="profile-modal-avatar-img" />
+                ) : (
+                  <div className="profile-modal-avatar-placeholder">{getInitials(username)}</div>
                 )}
+                <div className="profile-modal-avatar-hover">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </div>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleAvatarChange} style={{ display: 'none' }} />
+              {user?.customAvatar && (
+                <button className="btn-reset-avatar" onClick={handleResetAvatar} disabled={profileSaving}>
+                  Reset to intra photo
+                </button>
+              )}
+            </div>
+
+            <div className="profile-modal-body">
+              <div className="profile-identity">
+                <div className="profile-identity-name">{user?.nickname || user?.displayName || username}</div>
+                <div className="profile-identity-login">@{username}</div>
               </div>
 
-              <div className="profile-fields">
-                <div className="profile-field">
-                  <label className="profile-label">Nickname</label>
-                  <input
-                    type="text"
-                    className="team-input"
-                    value={profileNickname}
-                    onChange={(e) => setProfileNickname(e.target.value)}
-                    placeholder="Choose a nickname..."
-                    maxLength={20}
-                  />
-                  <span className="profile-hint">{profileNickname.length}/20 · Letters, numbers, _ and -</span>
+              <div className="profile-edit-section">
+                <label className="profile-label">Nickname</label>
+                <input
+                  type="text"
+                  className="profile-input"
+                  value={profileNickname}
+                  onChange={(e) => setProfileNickname(e.target.value)}
+                  placeholder="Choose a nickname..."
+                  maxLength={20}
+                />
+                <span className="profile-hint">{profileNickname.length}/20 · Letters, numbers, _ and -</span>
+              </div>
+
+              <div className="profile-divider"></div>
+              <div className="profile-readonly-title">42 Intra Info</div>
+
+              <div className="profile-info-grid">
+                <div className="profile-field-readonly">
+                  <label className="profile-label">Full Name</label>
+                  <div className="profile-value">{user?.displayName || '—'}</div>
                 </div>
-
-                <div className="profile-divider"></div>
-                <div className="profile-readonly-title">42 Intra Info</div>
-
-                <div className="profile-info-grid">
-                  <div className="profile-field-readonly">
-                    <label className="profile-label">Full Name</label>
-                    <div className="profile-value">{user?.displayName || '—'}</div>
-                  </div>
-                  <div className="profile-field-readonly">
-                    <label className="profile-label">Login</label>
-                    <div className="profile-value">@{username}</div>
-                  </div>
-                  <div className="profile-field-readonly">
-                    <label className="profile-label">Email</label>
-                    <div className="profile-value">{user?.email || '—'}</div>
-                  </div>
-                  <div className="profile-field-readonly">
-                    <label className="profile-label">Campus</label>
-                    <div className="profile-value">{campus}</div>
-                  </div>
-                  <div className="profile-field-readonly">
-                    <label className="profile-label">Level</label>
-                    <div className="profile-value">{level.toFixed(2)}</div>
-                  </div>
-                  <div className="profile-field-readonly">
-                    <label className="profile-label">Grade</label>
-                    <div className="profile-value">{grade}</div>
-                  </div>
+                <div className="profile-field-readonly">
+                  <label className="profile-label">Login</label>
+                  <div className="profile-value">@{username}</div>
+                </div>
+                <div className="profile-field-readonly">
+                  <label className="profile-label">Email</label>
+                  <div className="profile-value">{user?.email || '—'}</div>
+                </div>
+                <div className="profile-field-readonly">
+                  <label className="profile-label">Campus</label>
+                  <div className="profile-value">{campus}</div>
                 </div>
               </div>
 
               {profileError && <div className="profile-message error">{profileError}</div>}
               {profileSuccess && <div className="profile-message success">{profileSuccess}</div>}
             </div>
-            <div className="modal-footer">
+
+            <div className="profile-modal-footer">
               <button className="btn-secondary" onClick={() => setShowProfile(false)}>Close</button>
               <button className={`btn-primary ${profileSaving ? 'btn-disabled' : ''}`} onClick={handleProfileSave} disabled={profileSaving}>
                 {profileSaving ? 'Saving...' : 'Save Changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──── DELETE FRIEND CONFIRMATION ──── */}
+      {showDeleteFriendConfirm && friendToDelete && (
+        <div className="modal-overlay" onClick={() => { setShowDeleteFriendConfirm(false); setFriendToDelete(null); }}>
+          <div className="modal modal-confirm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Remove Friend?</h2>
+              <button className="modal-close" onClick={() => { setShowDeleteFriendConfirm(false); setFriendToDelete(null); }}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to remove <strong>@{friendToDelete.login}</strong> from your friends?</p>
+              <p>You can always add them back later.</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => { setShowDeleteFriendConfirm(false); setFriendToDelete(null); }}>Cancel</button>
+              <button className="btn-danger" onClick={confirmRemoveFriend}>Remove</button>
             </div>
           </div>
         </div>

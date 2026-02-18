@@ -12,7 +12,6 @@ app.use(cors({
   credentials: true
 }));
 
-// Increased limit to handle base64 image uploads (default is 100kb, images can be ~3MB as base64)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
