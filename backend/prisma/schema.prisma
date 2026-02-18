@@ -14,6 +14,8 @@ model User {
   displayName      String?
   email            String?
   avatar           String?
+  nickname         String?
+  customAvatar     String?
   campus           String?
   level            Float     @default(0)
   wallet           Int       @default(0)
@@ -29,10 +31,30 @@ model User {
   userProjects     UserProject[]
   deleteRequests   DeleteRequest[]
   deleteApprovals  DeleteApproval[]
+  sentFriendRequests     Friendship[] @relation("FriendRequester")
+  receivedFriendRequests Friendship[] @relation("FriendAddressee")
 
   @@index([intraId])
   @@index([login])
   @@index([curriculum])
+  @@index([nickname])
+}
+
+model Friendship {
+  id          Int      @id @default(autoincrement())
+  requesterId Int
+  addresseeId Int
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requester User @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId])
+  @@index([addresseeId])
+  @@index([status])
 }
 
 model Curriculum {
