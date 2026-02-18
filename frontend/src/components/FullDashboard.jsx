@@ -818,7 +818,6 @@ const FullDashboard = ({ user: userProp }) => {
       </aside>
 
       <main className="main">
-        {/* ============ DASHBOARD VIEW ============ */}
         {activeView === 'dashboard' && (
           <>
             <div className="header">
@@ -1286,14 +1285,9 @@ const FullDashboard = ({ user: userProp }) => {
         )}
       </main>
 
-      {/* ============ PROFILE MODAL ============ */}
       {showProfile && (
         <div className="modal-overlay" onClick={() => setShowProfile(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <h2>Profile</h2>
-              <button className="modal-close" onClick={() => setShowProfile(false)}>×</button>
-            </div>
             <div className="modal-body">
               <div className="profile-avatar-section">
                 <div className="profile-avatar-wrapper" onClick={() => fileInputRef.current?.click()}>
@@ -1374,7 +1368,6 @@ const FullDashboard = ({ user: userProp }) => {
         </div>
       )}
 
-      {/* ============ CREATE TEAM MODAL ============ */}
       {showCreateTeam && selectedProject && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -1460,7 +1453,6 @@ const FullDashboard = ({ user: userProp }) => {
         </div>
       )}
 
-      {/* ============ DELETE CONFIRM MODAL ============ */}
       {showDeleteConfirm && teamToDelete && (
         <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
           <div className="modal modal-confirm" onClick={e => e.stopPropagation()}>
@@ -1480,7 +1472,6 @@ const FullDashboard = ({ user: userProp }) => {
         </div>
       )}
 
-      {/* ============ TEAM REQUESTS MODAL ============ */}
       {showInvites && (
         <div className="modal-overlay" onClick={() => setShowInvites(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
