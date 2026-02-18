@@ -23,10 +23,14 @@ app.use((req, res, next) => {
 const authRoutes = require('./routes/auth.routes');
 const teamRoutes = require('./routes/team.routes');
 const projectRoutes = require('./routes/project.routes');
+const profileRoutes = require('./routes/profile.routes');
+const friendRoutes = require('./routes/friend.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/friends', friendRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', database: 'PostgreSQL' });

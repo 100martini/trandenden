@@ -101,11 +101,14 @@ const FullDashboard = ({ user: userProp }) => {
   }, []);
 
   useEffect(() => {
-    fetchFreshUser();
-    fetchProjects();
-    fetchMyTeams();
-    fetchPendingInvites();
-    fetchDeleteRequests();
+    const init = async () => {
+      await fetchFreshUser();
+      fetchProjects();
+      fetchMyTeams();
+      fetchPendingInvites();
+      fetchDeleteRequests();
+    };
+    init();
 
     const interval = setInterval(() => {
       fetchMyTeams();
@@ -1088,7 +1091,6 @@ const FullDashboard = ({ user: userProp }) => {
           </>
         )}
 
-        {/* ============ FRIENDS VIEW ============ */}
         {activeView === 'friends' && (
           <>
             <div className="header">
@@ -1168,7 +1170,7 @@ const FullDashboard = ({ user: userProp }) => {
                   />
                   {addUserSearch && <button className="friends-search-clear" onClick={() => { setAddUserSearch(''); setAddUserResults([]); }}>×</button>}
                 </div>
-                {addUserSearching && <div className="search-loading">Searching...</div>}
+                {addUserSearching && addUserSearch.length > 0 && <div className="search-loading">Searching...</div>}
 
                 {addUserResults.length > 0 ? (
                   <div className="friends-grid">
@@ -1402,7 +1404,7 @@ const FullDashboard = ({ user: userProp }) => {
                     onChange={handleSearchChange}
                     disabled={selectedMembers.length >= maxMembers}
                   />
-                  {searching && <div className="search-loading">Searching...</div>}
+                  {searching && searchQuery.length > 0 && <div className="search-loading">Searching...</div>}
                   {selectedMembers.length >= maxMembers && (
                     <div className="max-members-reached">Maximum team members reached</div>
                   )}
