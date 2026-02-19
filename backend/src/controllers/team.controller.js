@@ -24,6 +24,20 @@ const teamController = {
         return res.status(400).json({ error: 'You already have a team for this project' });
       }
 
+      const creatorPendingInvite = await prisma.teamMember.findFirst({
+        where: {
+          userId: req.userId,
+          status: 'pending',
+          team: {
+            projectId: project.id,
+            status: 'pending'
+          }
+        }
+      });
+      if (creatorPendingInvite) {
+        return res.status(400).json({ error: 'You have a pending team invite for this project. Accept or decline it first.' });
+      }
+
       for (const memberId of memberIds) {
         const memberTeam = await prisma.team.findFirst({
           where: {

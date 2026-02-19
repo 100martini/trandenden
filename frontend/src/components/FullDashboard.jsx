@@ -118,12 +118,11 @@ const FullDashboard = ({ user: userProp }) => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        const data = await response.json();
-        setFreshUser(prev => prev ? { ...prev, ...data.user } : data.user);
+        await fetchFreshUser();
       }
     } catch (err) {
     }
-  }, []);
+  }, [fetchFreshUser]);
 
   useEffect(() => {
     const init = async () => {
@@ -132,6 +131,8 @@ const FullDashboard = ({ user: userProp }) => {
       fetchMyTeams();
       fetchPendingInvites();
       fetchDeleteRequests();
+      fetchFriends();
+      fetchPendingFriendRequests();
       silentSync();
     };
     init();
@@ -140,6 +141,8 @@ const FullDashboard = ({ user: userProp }) => {
       fetchMyTeams();
       fetchPendingInvites();
       fetchDeleteRequests();
+      fetchFriends();
+      fetchPendingFriendRequests();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -290,7 +293,7 @@ const FullDashboard = ({ user: userProp }) => {
       if (response.ok) {
         const data = await response.json();
         if (data.autoAccepted) fetchFriends();
-        fetchPendingFriendRequests();
+        await fetchPendingFriendRequests();
         if (addUserSearch.length >= 2) handleAddFriendSearch(addUserSearch);
       }
     } catch (err) {
@@ -309,6 +312,8 @@ const FullDashboard = ({ user: userProp }) => {
       if (response.ok) {
         fetchFriends();
         fetchPendingFriendRequests();
+        setAddUserResults([]);
+        setAddUserSearch('');
       }
     } catch (err) {
       console.error('Failed to respond to friend request');
@@ -328,7 +333,12 @@ const FullDashboard = ({ user: userProp }) => {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) fetchFriends();
+      if (response.ok) {
+        fetchFriends();
+        fetchPendingFriendRequests();
+        setAddUserResults([]);
+        setAddUserSearch('');
+      }
     } catch (err) {
       console.error('Failed to remove friend');
     }
@@ -529,7 +539,7 @@ const FullDashboard = ({ user: userProp }) => {
     const normalizedSlug = projectSlug.toLowerCase().replace(/_/g, '-');
     const project = userProjects.find(p => {
       const pSlug = (p.project?.slug || '').toLowerCase().replace(/_/g, '-');
-      return pSlug.includes(normalizedSlug) || normalizedSlug.includes(pSlug);
+      return pSlug === normalizedSlug;
     });
     if (!project) return null;
     return {
@@ -639,7 +649,13 @@ const FullDashboard = ({ user: userProp }) => {
     return allOC;
   }, [isTranscender, allProjects, userProjects, getUserProjectStatus]);
 
+  const hasIncomingPendingInvite = useCallback((projectSlug) => {
+    return pendingInvites.some(i => i.project?.slug === projectSlug && i.myStatus === 'pending');
+  }, [pendingInvites]);
+
   const handleProjectClick = (project) => {
+    if (hasIncomingPendingInvite(project.slug)) return;
+
     if (project.team > 1 || project.minTeam > 1) {
       const existingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
       if (existingTeam) {
@@ -975,19 +991,21 @@ const FullDashboard = ({ user: userProp }) => {
                       const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
                       const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
                       const hasPendingTeam = !!pendingTeam;
+                      const hasPendingInvite = hasIncomingPendingInvite(project.slug);
+                      const isBlocked = hasPendingTeam || hasPendingInvite;
 
                       return (
                         <div
                           key={idx}
-                          className={`project-card ${activeTeam ? 'has-team' : ''} ${hasPendingTeam ? 'pending-team' : ''}`}
-                          onClick={() => !activeTeam && !hasPendingTeam && handleProjectClick(project)}
+                          className={`project-card ${activeTeam ? 'has-team' : ''} ${isBlocked ? 'pending-team' : ''}`}
+                          onClick={() => !activeTeam && !isBlocked && handleProjectClick(project)}
                         >
                           <div className="project-header">
                             <div className="project-icon">
                               {project.name.substring(0, 2).toUpperCase()}
                             </div>
-                            <span className={`project-badge ${activeTeam ? 'badge-completed' : hasPendingTeam ? 'badge-pending' : badge.className}`}>
-                              {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : badge.text}
+                            <span className={`project-badge ${activeTeam ? 'badge-completed' : isBlocked ? 'badge-pending' : badge.className}`}>
+                              {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : hasPendingInvite ? 'Invite Pending' : badge.text}
                             </span>
                           </div>
                           <div className="project-name">{project.name}</div>
@@ -1114,19 +1132,21 @@ const FullDashboard = ({ user: userProp }) => {
                           const activeTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'approved');
                           const pendingTeam = myTeams.find(t => t.project.slug === project.slug && t.status === 'pending');
                           const hasPendingTeam = !!pendingTeam;
+                          const hasPendingInvite = hasIncomingPendingInvite(project.slug);
+                          const isBlocked = hasPendingTeam || hasPendingInvite;
 
                           return (
                             <div
                               key={idx}
-                              className={`project-card ${activeTeam ? 'has-team' : ''} ${hasPendingTeam ? 'pending-team' : ''}`}
-                              onClick={() => !activeTeam && !hasPendingTeam && handleProjectClick(project)}
+                              className={`project-card ${activeTeam ? 'has-team' : ''} ${isBlocked ? 'pending-team' : ''}`}
+                              onClick={() => !activeTeam && !isBlocked && handleProjectClick(project)}
                             >
                               <div className="project-header">
                                 <div className="project-icon">
                                   {project.name.substring(0, 2).toUpperCase()}
                                 </div>
-                                <span className={`project-badge ${activeTeam ? 'badge-completed' : hasPendingTeam ? 'badge-pending' : badge.className}`}>
-                                  {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : badge.text}
+                                <span className={`project-badge ${activeTeam ? 'badge-completed' : isBlocked ? 'badge-pending' : badge.className}`}>
+                                  {activeTeam ? 'Active Team' : hasPendingTeam ? `Pending (${pendingTeam.acceptanceCount}/${pendingTeam.totalMembers})` : hasPendingInvite ? 'Invite Pending' : badge.text}
                                 </span>
                               </div>
                               <div className="project-name">{project.name}</div>
